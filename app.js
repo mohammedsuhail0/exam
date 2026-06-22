@@ -43,6 +43,15 @@
     return new Date().toISOString();
   }
 
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function renderQuestions(questions) {
     const mcqs = questions.filter(q => q.type === "mcq");
     const fibs = questions.filter(q => q.type === "fib");
@@ -50,15 +59,15 @@
     el.mcqContainer.innerHTML = mcqs.map((q, idx) => `
       <article class="card">
         <h2>Question ${idx + 1} (MCQ)</h2>
-        <p>${q.text}</p>
-        ${q.options.map((opt) => `<label><input type="radio" name="${q.id}" value="${opt}"> ${opt}</label>`).join("")}
+        <p>${escapeHtml(q.text)}</p>
+        ${q.options.map((opt) => `<label><input type="radio" name="${q.id}" value="${opt}"> ${escapeHtml(opt)}</label>`).join("")}
       </article>
     `).join("");
 
     el.fibContainer.innerHTML = fibs.map((q, idx) => `
       <article class="card">
         <h2>Question ${mcqs.length + idx + 1} (Fill in the blank)</h2>
-        <p>${q.text}</p>
+        <p>${escapeHtml(q.text)}</p>
         <input class="fib-input" data-qid="${q.id}" type="text" autocomplete="off" placeholder="Type answer here">
       </article>
     `).join("");
