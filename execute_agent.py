@@ -6,11 +6,13 @@ import math
 from playwright.async_api import async_playwright
 from groq import Groq
 
+import sys
+
 # Free Groq Developer token pipeline setup
 if not os.environ.get("GROQ_API_KEY"):
     print("[!] Error: GROQ_API_KEY environment variable is not set.")
     print("[!] Please set it in your terminal using: set GROQ_API_KEY=your_key_here")
-    return
+    sys.exit(1)
 
 async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=15):
     """Moves the mouse from (from_x, from_y) to (to_x, to_y) using a curved path with slight noise."""
