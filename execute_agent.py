@@ -8,10 +8,9 @@ from groq import Groq
 
 # Free Groq Developer token pipeline setup
 if not os.environ.get("GROQ_API_KEY"):
-    try:
-        os.environ["GROQ_API_KEY"] = "OlqlCuqUE2jVgwtEHI9VJrhlY3bydgW4vii5AQ6DJgBcs2rATd_ksg"[::-1]
-    except Exception:
-        print("[!] Warning: GROQ_API_KEY environment variable is not set.")
+    print("[!] Error: GROQ_API_KEY environment variable is not set.")
+    print("[!] Please set it in your terminal using: set GROQ_API_KEY=your_key_here")
+    return
 
 async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=15):
     """Moves the mouse from (from_x, from_y) to (to_x, to_y) using a curved path with slight noise."""
