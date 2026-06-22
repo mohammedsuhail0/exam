@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Online Exam Portal</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="container">
+    <section id="start-screen" class="panel">
+      <h1>Secure Online Exam Portal</h1>
+      <p class="muted">
+        Zero-Tolerance Mode is enabled. Focus, visibility, keyboard, pointer, and typing telemetry are monitored.
+      </p>
+      <ul class="rules">
+        <li>Leaving fullscreen or tab focus terminates the session.</li>
+        <li>Paste, blocked shortcuts, and suspicious input behavior are violations.</li>
+        <li>A single critical violation ends the exam.</li>
+      </ul>
+      <label class="consent">
+        <input id="consent" type="checkbox">
+        I consent to session monitoring and policy enforcement.
+      </label>
+      <button id="start-btn" class="btn primary" disabled>Start Secure Exam</button>
+    </section>
+
+    <section id="exam-screen" class="panel hidden">
+      <header class="exam-header">
+        <div>
+          <strong>Secure Mode Active</strong>
+          <p class="muted small">Session: <span id="session-id"></span></p>
+        </div>
+        <span id="status-pill" class="pill ok">Monitoring Active</span>
+      </header>
+
+      <div id="mcq-container"></div>
+      <div id="fib-container"></div>
+
+      <footer class="actions">
+        <button id="submit-btn" class="btn success">Finalize Submission</button>
+      </footer>
+    </section>
+
+    <section id="terminated-screen" class="panel hidden">
+      <h2 class="danger">Security Violation: Session Terminated</h2>
+      <p id="terminate-reason" class="muted"></p>
+      <p class="small">Reason code: <code id="terminate-code"></code></p>
+      <button id="restart-btn" class="btn">Reload</button>
+    </section>
+
+    <section id="result-screen" class="panel hidden">
+      <h2>Exam Result</h2>
+      <p id="result-summary" class="muted"></p>
+      <div id="result-breakdown"></div>
+      <button id="result-restart-btn" class="btn">Start New Attempt</button>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
