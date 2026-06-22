@@ -98,16 +98,84 @@ async def universal_destruction_engine():
             if not all_pages:
                 raise Exception("No active browser tabs discovered on port 9222.")
             
+            # Locate the currently active/visible tab
             page = all_pages[0]
             for p_target in all_pages:
-                if any(x in p_target.url for x in ["vercel.app", "localhost", "exam", "portal", "quiz", "test"]):
-                    page = p_target
-                    break
+                try:
+                    is_visible = await p_target.evaluate("document.visibilityState === 'visible'")
+                    if is_visible:
+                        page = p_target
+                        break
+                except:
+                    pass
                 
             print(f"[+] Successfully linked to active target window context: {page.url}")
             
-            # Locate all standalone card structures (questions) on the screen dynamically
-            question_cards = await page.query_selector_all('.card, fieldset, .question, div[id*="question"]')
+            # Locate all standalone card structures (questions) on the screen using generic layout mapping
+            find_containers_script = """
+            () => {
+                // Remove previous temporary classes
+                document.querySelectorAll('.data-agent-question').forEach(el => el.classList.remove('data-agent-question'));
+                
+                // 1. Try standard container selectors
+                let containers = Array.from(document.querySelectorAll('.card, fieldset, .question, .quiz-question, [id*="question"], [class*="question"]'));
+                
+                if (containers.length === 0) {
+                    // 2. Fallback: Group inputs by name (for radio/checkboxes) or closest parent
+                    const inputs = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
+                    const groups = {};
+                    inputs.forEach(input => {
+                        const name = input.name || 'unnamed';
+                        if (!groups[name]) groups[name] = [];
+                        groups[name].push(input);
+                    });
+                    
+                    const LCA_containers = new Set();
+                    Object.values(groups).forEach(groupInputs => {
+                        if (groupInputs.length === 0) return;
+                        let parent = groupInputs[0].parentElement;
+                        while (parent) {
+                            const containsAll = groupInputs.every(el => parent.contains(el));
+                            if (containsAll) {
+                                if (parent.tagName === 'BODY' || parent.tagName === 'HTML' || parent.tagName === 'FORM') {
+                                    break;
+                                }
+                                LCA_containers.add(parent);
+                                break;
+                            }
+                            parent = parent.parentElement;
+                        }
+                    });
+                    
+                    // Add text inputs/textareas
+                    const textInputs = Array.from(document.querySelectorAll('input[type="text"], textarea, [contenteditable="true"]'));
+                    textInputs.forEach(input => {
+                        const container = input.parentElement?.parentElement || input.parentElement;
+                        if (container && container.tagName !== 'BODY') {
+                            LCA_containers.add(container);
+                        }
+                    });
+                    
+                    containers = Array.from(LCA_containers);
+                }
+                
+                if (containers.length === 0) {
+                    // 3. Absolute fallback: leaf divs containing any input
+                    containers = Array.from(document.querySelectorAll('div')).filter(div => {
+                        return div.querySelector('input, textarea, select') && !div.querySelector('div');
+                    });
+                }
+                
+                // Add the helper class to all found containers
+                containers.forEach(el => el.classList.add('data-agent-question'));
+            }
+            """
+            
+            # Execute class tagging in browser context
+            await page.evaluate(find_containers_script)
+            
+            # Locate all tagged questions using standard Playwright selectors
+            question_cards = await page.query_selector_all('.data-agent-question')
             print(f"[+] Discovered {len(question_cards)} distinct question containers on this workspace.")
 
             # JavaScript to annotate interactive elements inside a card
