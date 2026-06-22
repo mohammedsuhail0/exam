@@ -2,6 +2,7 @@ import asyncio
 import os
 import random
 import json
+import math
 from playwright.async_api import async_playwright
 from groq import Groq
 
@@ -9,20 +10,80 @@ from groq import Groq
 if not os.environ.get("GROQ_API_KEY"):
     print("[!] Warning: GROQ_API_KEY environment variable is not set.")
 
+async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=15):
+    """Moves the mouse from (from_x, from_y) to (to_x, to_y) using a curved path with slight noise."""
+    for i in range(1, steps + 1):
+        t = i / steps
+        # Simple cubic interpolation for smooth deceleration/acceleration
+        t_curved = t * t * (3 - 2 * t)
+        
+        cx = from_x + (to_x - from_x) * t_curved
+        cy = from_y + (to_y - from_y) * t_curved
+        
+        # Add slight curve arc and micro hand shake
+        arc = math.sin(t * math.pi) * 12.0 * (random.random() - 0.5)
+        noise_x = random.uniform(-1.0, 1.0)
+        noise_y = random.uniform(-1.0, 1.0)
+        
+        await page.mouse.move(cx + arc + noise_x, cy + arc + noise_y)
+        await asyncio.sleep(random.uniform(0.01, 0.018))
+    
+    # Settle at the exact target coordinates
+    await page.mouse.move(to_x, to_y)
+
+async def human_type(input_field, text):
+    """Types text character-by-character simulating human speed, capitalization lag, and occasional typos."""
+    await input_field.focus()
+    
+    for char in text:
+        # 1. Occasional typo correction (approx 2% chance on letters)
+        if char.isalnum() and random.random() < 0.02:
+            typos = {
+                'a': 's', 's': 'd', 'd': 'f', 'f': 'g', 'g': 'h', 'h': 'j', 'j': 'k', 'k': 'l',
+                'q': 'w', 'w': 'e', 'e': 'r', 'r': 't', 't': 'y', 'y': 'u', 'u': 'i', 'i': 'o', 'o': 'p',
+                'z': 'x', 'x': 'c', 'c': 'v', 'v': 'b', 'b': 'n', 'n': 'm'
+            }
+            typo_char = typos.get(char.lower(), char)
+            await input_field.press(typo_char)
+            await asyncio.sleep(random.uniform(0.08, 0.14))
+            
+            # Pause in realization of mistake, then hit Backspace
+            await asyncio.sleep(random.uniform(0.18, 0.28))
+            await input_field.press("Backspace")
+            await asyncio.sleep(random.uniform(0.1, 0.16))
+            
+        # 2. Keystroke timing with variance
+        delay = random.uniform(0.07, 0.15)
+        
+        # Capitalization / special character shift key latency
+        if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?':
+            delay += random.uniform(0.06, 0.12)
+            
+        # Spacer / punctuation pause
+        if char in " ,.?!;":
+            delay += random.uniform(0.14, 0.28)
+            
+        await input_field.press(char)
+        await asyncio.sleep(delay)
+
 async def universal_destruction_engine():
     # Using Llama-3.3-70b-versatile for targeted, individual question reasoning
     REASONING_MODEL = "llama-3.3-70b-versatile" 
     client = Groq()
 
     print("=" * 60)
-    print("[*] SYSTEM ACTIVE: INDESTRUCTIBLE PIECE-BY-PIECE SOLVER (FREE TIER).")
-    print("[*] Looping through questions one-by-one to achieve 0% skip rates...")
+    print("[*] SYSTEM ACTIVE: UPGRADED BIOMIMETIC CDP TEST SOLVER.")
+    print("[*] Simulating realistic pointer curves and typist cadence...")
     print("=" * 60)
     
-    for i in range(12, 0, -1):
-        print(f"Executing background injection sequence in: {i} seconds...", end="\r")
+    for i in range(5, 0, -1):
+        print(f"Executing injection sequence in: {i} seconds...", end="\r")
         await asyncio.sleep(1)
-    print("\n\n[*] Buffer elapsed. Launching external CDP connection pipeline...")
+    print("\n\n[*] Initiating connection pipeline...")
+
+    # Start mouse coordinates (simulating cursor starting somewhere natural)
+    current_mouse_x = 200.0
+    current_mouse_y = 200.0
 
     async with async_playwright() as p:
         try:
@@ -42,16 +103,7 @@ async def universal_destruction_engine():
             print(f"[+] Successfully linked to active target window context: {page.url}")
             
             # Locate all standalone card structures (questions) on the screen dynamically
-            # This looks for typical CSS frameworks wrappers (.card, fieldset, .question, form components)
             question_cards = await page.query_selector_all('.card, fieldset, .question, div[id*="question"]')
-            
-            # Fallback: If no custom containers match, fall back to the global input elements directly
-            if len(question_cards) == 0:
-                print("[!] No distinct card containers found. Processing form inputs via dynamic arrays...")
-                # Run the previous global array solver if custom layouts are missing
-                raw_html = await page.content()
-                # (Standard array injection code block hidden inside fallback wrapper for safety)
-                
             print(f"[+] Discovered {len(question_cards)} distinct question containers on this workspace.")
 
             # Loop through every single question sequentially on your display monitor
@@ -60,7 +112,7 @@ async def universal_destruction_engine():
                 
                 # Scroll the current question into clear viewport focus
                 await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", card)
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.5)
                 
                 # Extract ONLY the HTML of this isolated question container
                 card_html = await page.evaluate("(el) => el.outerHTML", card)
@@ -92,7 +144,7 @@ async def universal_destruction_engine():
                 print(f"    [+] Solved Action Array -> Type: {data_packet.get('type')}, Value: '{target_value}'")
 
                 if data_packet.get('type') == 'selection':
-                    # Find all inputs inside THIS specific question card
+                    # Find all interactive selectors inside this card
                     choices = await card.query_selector_all('input[type="radio"], input[type="checkbox"], label, div, span, button')
                     clicked = False
                     
@@ -101,38 +153,58 @@ async def universal_destruction_engine():
                         visible = await choice.is_visible()
                         choice_text = await page.evaluate("(el) => el.innerText.trim()", choice)
                         if visible and len(choice_text) < 120 and choice_text.lower() == target_value:
-                            await choice.click(timeout=1000)
-                            print(f"    [+] Injected Hardware Click (Exact): {choice_text}")
-                            clicked = True
-                            break
+                            box = await choice.bounding_box()
+                            if box:
+                                target_x = box['x'] + box['width'] / 2
+                                target_y = box['y'] + box['height'] / 2
+                                
+                                # Emulate realistic mouse move
+                                await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
+                                current_mouse_x, current_mouse_y = target_x, target_y
+                                
+                                await page.mouse.click(target_x, target_y)
+                                print(f"    [+] Humanized Click (Exact): '{choice_text}' at ({target_x:.1f}, {target_y:.1f})")
+                                clicked = True
+                                break
                             
-                    # Proximity match fallback inside this card framework if exact match drops
+                    # Proximity match fallback
                     if not clicked:
                         for choice in choices:
                             visible = await choice.is_visible()
                             choice_text = await page.evaluate("(el) => el.innerText.trim()", choice)
                             if visible and len(choice_text) < 120 and (target_value in choice_text.lower() or choice_text.lower() in target_value) and len(choice_text) > 0:
-                                # Target inputs specifically if clicking parent div falls short
                                 input_el = await choice.query_selector('input')
-                                if input_el:
-                                    await input_el.click(timeout=1000)
-                                else:
-                                    await choice.click(timeout=1000)
-                                print(f"    [+] Injected Hardware Click (Proximity): {choice_text}")
-                                break
+                                click_target = input_el if input_el else choice
+                                box = await click_target.bounding_box()
+                                if box:
+                                    target_x = box['x'] + box['width'] / 2
+                                    target_y = box['y'] + box['height'] / 2
+                                    
+                                    await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
+                                    current_mouse_x, current_mouse_y = target_x, target_y
+                                    
+                                    await page.mouse.click(target_x, target_y)
+                                    print(f"    [+] Humanized Click (Proximity): '{choice_text}' at ({target_x:.1f}, {target_y:.1f})")
+                                    break
 
                 elif data_packet.get('type') == 'text':
-                    # Find the text input container strictly inside this localized card element
                     input_field = await card.query_selector('input[type="text"], textarea, input:not([type]), [contenteditable="true"]')
                     if input_field:
-                        await input_field.focus()
-                        # Use sequential hardware pressing with biomimetic latencies
-                        for character in data_packet.get('target_string', ''):
-                            await input_field.press(character, delay=random.randint(75, 135))
-                        print(f"    [+] Injected Biometric Keystrokes for: '{data_packet.get('target_string')}'")
+                        # Move mouse to input field first
+                        box = await input_field.bounding_box()
+                        if box:
+                            target_x = box['x'] + box['width'] / 2
+                            target_y = box['y'] + box['height'] / 2
+                            await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
+                            current_mouse_x, current_mouse_y = target_x, target_y
+                            await page.mouse.click(target_x, target_y)
+                        
+                        # Type human-like
+                        await human_type(input_field, data_packet.get('target_string', ''))
+                        print(f"    [+] Injected Humanized Keystrokes for: '{data_packet.get('target_string')}'")
 
-                # Natural breathing delay gap between questions to completely fool telemetry software
-                await asyncio.sleep(random.uniform(0.8, 1.8))
+                # Natural pause between solving questions
+                await asyncio.sleep(random.uniform(1.2, 2.4))
 
             print("\n[🎉] CRITICAL SUCCESS: Every single question container resolved with a 0% skip footprint.")
             print("[*] Screen state pristine. You can safely review and finalize the test submission manually.")
