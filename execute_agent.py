@@ -71,8 +71,14 @@ async def human_type(input_field, text):
         await asyncio.sleep(delay)
 
 async def universal_destruction_engine():
-    # Using Llama-3.3-70b-versatile for targeted, individual question reasoning
-    REASONING_MODEL = "llama-3.3-70b-versatile" 
+    # Priority list of models on Groq with fallback
+    CANDIDATE_MODELS = [
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
+        "qwen/qwen3.6-27b",
+        "openai/gpt-oss-20b",
+        "llama-3.3-70b-versatile"
+    ]
     client = Groq()
 
     print("=" * 60)
@@ -212,33 +218,44 @@ async def universal_destruction_engine():
                 # Annotate the card dynamically in the browser DOM and get its HTML
                 annotated_html = await page.evaluate(annotate_script, card)
                 
-                # Query the AI exclusively for this single annotated question item
-                response = client.chat.completions.create(
-                    model=REASONING_MODEL,
-                    response_format={"type": "json_object"},
-                    messages=[
-                        {
-                            "role": "system", 
-                            "content": (
-                                "You are an automated academic solver parsing a single-question HTML node. "
-                                "The HTML elements have been annotated with a 'data-agent-target' attribute containing a number.\n\n"
-                                "Your goal is to solve the question and identify which annotated element needs to be clicked or typed into.\n\n"
-                                "Determine if this is a multiple-choice selection or a text-entry fill-in-the-blank question.\n\n"
-                                "Output your response strictly as a JSON object with these keys:\n"
-                                "1. 'type': 'selection' or 'text'\n"
-                                "2. 'target_index': The integer (or string representation of the integer) in the 'data-agent-target' attribute of the element that should be clicked (for selection) or focused (for text input).\n"
-                                "3. 'target_string': (Only for text type) The exact text string that should be typed into the input field.\n\n"
-                                "Example for selection:\n"
-                                "{\"type\": \"selection\", \"target_index\": 1}\n\n"
-                                "Example for text:\n"
-                                "{\"type\": \"text\", \"target_index\": 3, \"target_string\": \"client\"}"
-                            )
-                        },
-                        {"role": "user", "content": f"Solve this single item code container:\n{annotated_html}"}
-                    ]
-                )
+                # Query the AI with candidate model fallback
+                data_packet = None
+                for model_name in CANDIDATE_MODELS:
+                    try:
+                        response = client.chat.completions.create(
+                            model=model_name,
+                            response_format={"type": "json_object"},
+                            messages=[
+                                {
+                                    "role": "system", 
+                                    "content": (
+                                        "You are an automated academic solver parsing a single-question HTML node. "
+                                        "The HTML elements have been annotated with a 'data-agent-target' attribute containing a number.\n\n"
+                                        "Your goal is to solve the question and identify which annotated element needs to be clicked or typed into.\n\n"
+                                        "Determine if this is a multiple-choice selection or a text-entry fill-in-the-blank question.\n\n"
+                                        "Output your response strictly as a JSON object with these keys:\n"
+                                        "1. 'type': 'selection' or 'text'\n"
+                                        "2. 'target_index': The integer (or string representation of the integer) in the 'data-agent-target' attribute of the element that should be clicked (for selection) or focused (for text input).\n"
+                                        "3. 'target_string': (Only for text type) The exact text string that should be typed into the input field.\n\n"
+                                        "Example for selection:\n"
+                                        "{\"type\": \"selection\", \"target_index\": 1}\n\n"
+                                        "Example for text:\n"
+                                        "{\"type\": \"text\", \"target_index\": 3, \"target_string\": \"client\"}"
+                                    )
+                                },
+                                {"role": "user", "content": f"Solve this single item code container:\n{annotated_html}"}
+                            ]
+                        )
+                        data_packet = json.loads(response.choices[0].message.content.strip())
+                        break
+                    except Exception as model_err:
+                        # Fallback to next model if model not found or unavailable
+                        continue
 
-                data_packet = json.loads(response.choices[0].message.content.strip())
+                if not data_packet:
+                    print("    [!] Failed to solve element: All reasoning models failed or unavailable.")
+                    continue
+
                 target_index = str(data_packet.get('target_index', ''))
                 action_type = data_packet.get('type')
                 
