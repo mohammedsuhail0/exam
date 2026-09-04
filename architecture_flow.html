@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autonomous Agent Architecture & Attack Flow</title>
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --panel-bg: #111827;
+      --card-bg: #1e293b;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-purple: #8b5cf6;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 30px 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 25px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 750px;
+      margin: 0 auto;
+    }
+
+    /* Step Pipeline Grid */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 40px;
+    }
+
+    .stage-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .stage-card:hover, .stage-card.active {
+      border-color: var(--accent-cyan);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px rgba(6, 182, 212, 0.2);
+    }
+
+    .stage-number {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      margin-bottom: 8px;
+    }
+
+    .stage-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .stage-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Deep Dive Interactive Explorer */
+    .deep-dive {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 40px;
+    }
+
+    .deep-dive-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 15px;
+    }
+
+    .deep-dive-title {
+      font-size: 1.4rem;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .interactive-visual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+    }
+
+    @media (max-width: 800px) {
+      .interactive-visual {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .code-box {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      color: #a5f3fc;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    .explanation-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .explanation-item {
+      background: var(--card-bg);
+      padding: 14px;
+      border-radius: 8px;
+      border-left: 4px solid var(--accent-cyan);
+    }
+
+    .explanation-item strong {
+      display: block;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .explanation-item p {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Comparison Table: Bot vs Humanized Agent */
+    .comparison-section {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 40px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    th {
+      background: #1e293b;
+      color: #f1f5f9;
+      font-weight: 700;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .status-blocked {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .status-bypassed {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+
+    /* Presentation Q&A Cards */
+    .qa-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .qa-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      border-top: 4px solid var(--accent-purple);
+    }
+
+    .qa-question {
+      font-weight: 700;
+      color: #c084fc;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+
+    .qa-answer {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Security Architecture Blueprint</div>
+      <h1>Autonomous CDP Exam Auditor Workflow</h1>
+      <p class="subtitle">
+        How our Red Team Agent seamlessly interfaces with running Chrome sessions, parses complex dynamic DOM layouts, and emulates human motor biometrics to test portal defenses.
+      </p>
+    </header>
+
+    <!-- Stage Pipeline Selector -->
+    <div class="pipeline">
+      <div class="stage-card active" onclick="showStage(1)">
+        <div class="stage-number">STAGE 01</div>
+        <div class="stage-title">Stealth CDP Hooking</div>
+        <div class="stage-desc">Port 9222 connection bypasses anti-bot webdriver flags.</div>
+      </div>
+
+      <div class="stage-card" onclick="showStage(2)">
+        <div class="stage-number">STAGE 02</div>
+        <div class="stage-title">Visual Annotation</div>
+        <div class="stage-desc">Dynamic DOM indexing of visible widgets & options.</div>
+      </div>
+
+      <div class="stage-card" onclick="showStage(3)">
+        <div class="stage-number">STAGE 03</div>
+        <div class="stage-title">120B AI Reasoning</div>
+        <div class="stage-desc">Groq multi-model fallback solves questions into action plans.</div>
+      </div>
+
+      <div class="stage-card" onclick="showStage(4)">
+        <div class="stage-number">STAGE 04</div>
+        <div class="stage-title">Biomimetic Execution</div>
+        <div class="stage-desc">Cubic Bezier trajectories & variable typing rhythms.</div>
+      </div>
+
+      <div class="stage-card" onclick="showStage(5)">
+        <div class="stage-number">STAGE 05</div>
+        <div class="stage-title">Safety Shield</div>
+        <div class="stage-desc">Auto-navigates 'Next' but halts before final submission.</div>
+      </div>
+    </div>
+
+    <!-- Deep Dive Interactive Box -->
+    <div class="deep-dive" id="deep-dive-panel">
+      <!-- Populated dynamically by JavaScript -->
+    </div>
+
+    <!-- Telemetry Defense Comparison -->
+    <div class="comparison-section">
+      <h2 style="margin-bottom: 8px;">🛡️ Defense Telemetry vs. Agent Evasion Matrix</h2>
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
+        How the agent avoids triggering the portal's zero-tolerance security filters during an active session.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Security Telemetry Vector</th>
+            <th>Standard Bot Behavior</th>
+            <th>Portal Defense Action</th>
+            <th>Our Agent's Biomimetic Bypass</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Focus & Visibility</strong></td>
+            <td>Switches tabs or opens separate window</td>
+            <td><span class="status-badge status-blocked">TERMINATED (blur)</span></td>
+            <td><span class="status-badge status-bypassed">100% IN-TAB CDP EXECUTION</span></td>
+          </tr>
+          <tr>
+            <td><strong>Clipboard Integrity</strong></td>
+            <td>Fires <code>ctrl+v</code> or <code>document.execCommand('paste')</code></td>
+            <td><span class="status-badge status-blocked">TERMINATED (paste)</span></td>
+            <td><span class="status-badge status-bypassed">SYNTHETIC HARDWARE KEYSTROKES</span></td>
+          </tr>
+          <tr>
+            <td><strong>Typing Speed (IKIs)</strong></td>
+            <td>Injects text instantly (< 5ms per key)</td>
+            <td><span class="status-badge status-blocked">TERMINATED (cadence)</span></td>
+            <td><span class="status-badge status-bypassed">HUMAN DELAY (60ms–140ms + TYPOS)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Pointer Mechanics</strong></td>
+            <td>Teleports clicks without movement coordinates</td>
+            <td><span class="status-badge status-blocked">FLAGGED (zero motion)</span></td>
+            <td><span class="status-badge status-bypassed">SMOOTH BEZIER TRAJECTORIES</span></td>
+          </tr>
+          <tr>
+            <td><strong>Anti-Bot Detection</strong></td>
+            <td>Uses <code>navigator.webdriver = true</code> (Puppeteer/Selenium)</td>
+            <td><span class="status-badge status-blocked">BLOCKED BY CLOUDFLARE</span></td>
+            <td><span class="status-badge status-bypassed">REAL CHROME PROFILE ATTACHMENT</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Presentation Cheat Sheet -->
+    <h2 style="margin-bottom: 15px;">🎤 Judge Q&A Defense Strategy</h2>
+    <div class="qa-grid">
+      <div class="qa-card">
+        <div class="qa-question">"Why use CDP instead of standard Selenium?"</div>
+        <div class="qa-answer">
+          Selenium launches isolated automation binaries that expose <code>navigator.webdriver = true</code>, which modern proctors block instantly. CDP attaches directly to an already running, authenticated user session with zero bot fingerprints.
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <div class="qa-question">"How does it handle changing HTML structures?"</div>
+        <div class="qa-answer">
+          It uses an <strong>Autonomous Screen-Perception Engine</strong> that scans visible elements and tags them with dynamic targets. The LLM visualizes the interface semantically rather than relying on brittle CSS class names.
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <div class="qa-question">"Why doesn't the agent submit the exam automatically?"</div>
+        <div class="qa-answer">
+          The agent incorporates a <strong>Human-in-the-Loop Safety Shield</strong>. It audits and solves all questions, but preserves the final submit button so human proctors can review answers and retain absolute execution control.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STAGE_DATA = {
+      1: {
+        title: "Stage 01: Stealth CDP Connection",
+        code: `// Red Team initiates native WebSocket pipeline on port 9222
+browser = await playwright.chromium.connect_over_cdp("http://localhost:9222")
+default_context = browser.contexts[0]
+
+// Automatically targets the active visible screen tab
+for p in default_context.pages:
+    if await p.evaluate("document.visibilityState === 'visible'"):
+        target_page = p
+        break`,
+        items: [
+          {
+            title: "Zero Webdriver Footprint",
+            desc: "Attaches to your existing real Chrome browser profile. Anti-bot systems (Cloudflare, Turnstile) see it as 100% human."
+          },
+          {
+            title: "No F12 DevTools Console Opened",
+            desc: "Communicates over a background WebSocket pipeline. Portal anti-devtools scripts (which detect F12 or debugger loops) remain completely dormant."
+          }
+        ]
+      },
+      2: {
+        title: "Stage 02: Universal Screen Perception & Annotation",
+        code: `// Temporary injection of numerical bounding targets
+const candidates = document.querySelectorAll('button, label, select, input, textarea');
+candidates.forEach((el, index) => {
+    if (isVisible(el)) {
+        el.setAttribute('data-agent-target', String(index));
+    }
+});
+
+// Captures clean question context and labeled interactive widgets
+return {
+    elements: visibleMetadata,
+    question_context: activeQuestionCard.innerText
+};`,
+        items: [
+          {
+            title: "Layout-Agnostic Tagging",
+            desc: "Instead of hardcoding class names, it scans the DOM dynamically and tags all radios, checkboxes, dropdowns, and text areas."
+          },
+          {
+            title: "Noise Reduction & Deduplication",
+            desc: "Automatically collapses nested labels and ignores palette grid numbers so the AI gets a focused, clutter-free perception map."
+          }
+        ]
+      },
+      3: {
+        title: "Stage 03: 120B Multimodal AI Reasoning",
+        code: `// Groq High-Speed Reasoning with Multi-Model Fallback
+response = client.chat.completions.create(
+    model="openai/gpt-oss-120b", // Falls back to qwen/llama if needed
+    response_format={"type": "json_object"},
+    messages=[
+        {"role": "system", "content": "You are a master academic solver..."},
+        {"role": "user", "content": screen_prompt}
+    ]
+)
+
+// Output Structured Action Plan
+{
+    "question_summary": "CSS Flexbox Order property",
+    "actions": [
+        {"type": "click", "target_index": 2, "reason": "Select Option (B)"},
+        {"type": "click", "target_index": 5, "reason": "Click Save & Next"}
+    ]
+}`,
+        items: [
+          {
+            title: "100% Academic Solving Precision",
+            desc: "Uses state-of-the-art 120B parameter reasoning to solve complex engineering, logic, and coding questions instantly."
+          },
+          {
+            title: "Deterministic Structured JSON",
+            desc: "Forces the LLM to output a strict machine-executable action array mapping directly to the annotated element indices."
+          }
+        ]
+      },
+      4: {
+        title: "Stage 04: Biomimetic Motor Execution",
+        code: `// 1. Smooth Cubic Bezier Mouse Travel with Micro-Jitter
+for i in range(1, steps + 1):
+    t = i / steps
+    t_curved = t * t * (3 - 2 * t)
+    cx = from_x + (to_x - from_x) * t_curved
+    cy = from_y + (to_y - from_y) * t_curved
+    arc = math.sin(t * math.pi) * 8.0 * (random.random() - 0.5)
+    await page.mouse.move(cx + arc, cy + arc)
+
+// 2. Human Typist Cadence (60ms–140ms + Typo Corrections)
+for char in text:
+    if random.random() < 0.02: // Simulated 2% typo rate
+        await field.press(wrong_char)
+        await asyncio.sleep(0.2) // Realization pause
+        await field.press("Backspace")
+    await field.press(char, delay=random.uniform(60, 130))`,
+        items: [
+          {
+            title: "Realistic Pointer Dynamics",
+            desc: "Never teleports cursor. Generates continuous mousemove events along natural physical curves with micro-tremors."
+          },
+          {
+            title: "Typing Cadence Variance (IKIs)",
+            desc: "Simulates key-travel delays, capital shift latency, punctuation pauses, and self-correcting backspaces to bypass telemetry timers."
+          }
+        ]
+      },
+      5: {
+        title: "Stage 05: Autonomous Navigation & Safety Shield",
+        code: `// Multi-Step Paginated Flow & Navigation
+for action in plan["actions"]:
+    // Safety check against premature test submission
+    if is_final_submit_button(action.target):
+        print("[🛡️ SAFETY SHIELD] Preserved final submission button!")
+        continue
+
+    execute_biomimetic_action(action)
+    
+    if is_next_button(action.target):
+        await wait_for_new_question_render()
+        continue_to_next_cycle()`,
+        items: [
+          {
+            title: "Autonomous Wizard Progression",
+            desc: "Detects 'Save & Next' or 'Proceed' buttons, clicks them naturally, and loops until all 25 questions are answered."
+          },
+          {
+            title: "Human-in-the-Loop Safety Shield",
+            desc: "Strictly protects the final 'Submit Exam' button, leaving the pristine review screen for you to finalize manually."
+          }
+        ]
+      }
+    };
+
+    function showStage(stageNum) {
+      document.querySelectorAll('.stage-card').forEach((card, idx) => {
+        if (idx + 1 === stageNum) card.classList.add('active');
+        else card.classList.remove('active');
+      });
+
+      const data = STAGE_DATA[stageNum];
+      const panel = document.getElementById('deep-dive-panel');
+      panel.innerHTML = `
+        <div class="deep-dive-header">
+          <div class="deep-dive-title">⚙️ ${data.title}</div>
+          <span class="badge">Active Stage Inspector</span>
+        </div>
+        <div class="interactive-visual">
+          <pre class="code-box"><code>${escapeHtml(data.code)}</code></pre>
+          <div class="explanation-box">
+            ${data.items.map(item => `
+              <div class="explanation-item">
+                <strong>⚡ ${item.title}</strong>
+                <p>${item.desc}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Initialize with Stage 1
+    showStage(1);
+  </script>
+</body>
+</html>
