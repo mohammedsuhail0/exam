@@ -126,12 +126,10 @@
       el.submitBtn.classList.add("hidden");
     }
 
-    let badgeHtml = "";
     let inputHtml = "";
     const savedVal = state.userAnswers[q.id];
 
     if (q.type === "mcq") {
-      badgeHtml = `<span class="badge badge-single">Multiple Choice (Single)</span>`;
       inputHtml = q.options.map(opt => {
         const checked = savedVal === opt ? "checked" : "";
         return `
@@ -142,7 +140,6 @@
         `;
       }).join("");
     } else if (q.type === "multi_mcq") {
-      badgeHtml = `<span class="badge badge-multi">Multiple Selection (Checkboxes)</span>`;
       const savedArr = Array.isArray(savedVal) ? savedVal : [];
       inputHtml = q.options.map(opt => {
         const checked = savedArr.includes(opt) ? "checked" : "";
@@ -154,7 +151,6 @@
         `;
       }).join("");
     } else if (q.type === "dropdown") {
-      badgeHtml = `<span class="badge badge-dropdown">Dropdown Selection</span>`;
       inputHtml = `
         <select class="custom-select" data-qid="${q.id}">
           <option value="">-- Select Answer --</option>
@@ -165,12 +161,10 @@
         </select>
       `;
     } else if (q.type === "fib") {
-      badgeHtml = `<span class="badge badge-fib">Fill in the Blank</span>`;
       inputHtml = `
         <input class="fib-input" data-qid="${q.id}" type="text" autocomplete="off" placeholder="Type answer here" value="${escapeHtml(savedVal || "")}">
       `;
     } else if (q.type === "textarea") {
-      badgeHtml = `<span class="badge badge-textarea">Code / Text Response</span>`;
       inputHtml = `
         <textarea class="fib-input" data-qid="${q.id}" autocomplete="off" placeholder="Write answer here...">${escapeHtml(savedVal || "")}</textarea>
       `;
@@ -178,7 +172,6 @@
 
     el.questionViewport.innerHTML = `
       <article class="card">
-        ${badgeHtml}
         <h2>Question ${idx + 1}</h2>
         <div class="question-text">${escapeHtml(q.text)}</div>
         <div class="question-controls">
