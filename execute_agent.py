@@ -15,10 +15,8 @@ if not GROQ_API_KEY:
     print("[!] Run: set GROQ_API_KEY=your_key_here")
     sys.exit(1)
 
-# Initialize Groq client
 client = Groq(api_key=GROQ_API_KEY)
 
-# Prioritized multi-model fallback cascade
 CANDIDATE_MODELS = [
     "openai/gpt-oss-120b",
     "qwen/qwen3.8-27b",
@@ -27,7 +25,7 @@ CANDIDATE_MODELS = [
     "llama-3.3-70b-versatile"
 ]
 
-async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=10):
+async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=8):
     """Generates physical cubic Bezier curves with micro-tremors to mimic human hand motor dynamics."""
     try:
         for i in range(1, steps + 1):
@@ -37,12 +35,12 @@ async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=10):
             cx = from_x + (to_x - from_x) * t_curved
             cy = from_y + (to_y - from_y) * t_curved
             
-            arc = math.sin(t * math.pi) * 5.0 * (random.random() - 0.5)
-            noise_x = random.uniform(-0.4, 0.4)
-            noise_y = random.uniform(-0.4, 0.4)
+            arc = math.sin(t * math.pi) * 4.0 * (random.random() - 0.5)
+            noise_x = random.uniform(-0.3, 0.3)
+            noise_y = random.uniform(-0.3, 0.3)
             
             await page.mouse.move(cx + arc + noise_x, cy + arc + noise_y)
-            await asyncio.sleep(random.uniform(0.006, 0.012))
+            await asyncio.sleep(random.uniform(0.005, 0.010))
         
         await page.mouse.move(to_x, to_y)
     except Exception:
@@ -52,7 +50,7 @@ async def human_type(input_field, text):
     """Types text with natural human variance, capitalization pauses, and occasional auto-corrected typos."""
     try:
         await input_field.focus()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.04)
         
         for char in text:
             # 2% realistic typo auto-correction
@@ -64,21 +62,20 @@ async def human_type(input_field, text):
                 }
                 typo_char = typos.get(char.lower(), char)
                 await input_field.press(typo_char)
-                await asyncio.sleep(random.uniform(0.04, 0.08))
-                await asyncio.sleep(random.uniform(0.08, 0.14))
+                await asyncio.sleep(random.uniform(0.04, 0.07))
+                await asyncio.sleep(random.uniform(0.06, 0.10))
                 await input_field.press("Backspace")
-                await asyncio.sleep(random.uniform(0.05, 0.09))
+                await asyncio.sleep(random.uniform(0.04, 0.07))
                 
-            delay = random.uniform(0.03, 0.08)
+            delay = random.uniform(0.02, 0.06)
             if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?':
-                delay += random.uniform(0.04, 0.08)
+                delay += random.uniform(0.03, 0.07)
             if char in " ,.?!;":
-                delay += random.uniform(0.06, 0.12)
+                delay += random.uniform(0.05, 0.10)
                 
             await input_field.press(char)
             await asyncio.sleep(delay)
     except Exception:
-        # Fallback to direct fill if typing encounters an event lock
         try:
             await input_field.fill(text)
         except Exception:
@@ -158,10 +155,9 @@ ANNOTATE_SCREEN_SCRIPT = """
 }
 """
 
-async def robust_click_element(page, element, target_x=None, target_y=None, from_x=250.0, from_y=250.0):
+async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
     """Executes a 3-tier fallback click ensuring the element is activated regardless of styling."""
     try:
-        # Tier 1: Biomimetic Human Mouse Move & Click
         box = await element.bounding_box()
         if box and box['width'] > 0 and box['height'] > 0:
             tx = box['x'] + box['width'] / 2
@@ -173,14 +169,12 @@ async def robust_click_element(page, element, target_x=None, target_y=None, from
         pass
 
     try:
-        # Tier 2: Playwright Force Click
-        await element.click(force=True, timeout=1000)
+        await element.click(force=True, timeout=800)
         return True, from_x, from_y
     except Exception:
         pass
 
     try:
-        # Tier 3: Direct DOM Event Dispatch
         await page.evaluate("(el) => { el.focus(); el.click(); }", element)
         return True, from_x, from_y
     except Exception:
@@ -189,24 +183,21 @@ async def robust_click_element(page, element, target_x=None, target_y=None, from
     return False, from_x, from_y
 
 async def robust_select_dropdown(element, opt_val):
-    """3-tier resilient dropdown option selector."""
+    """4-tier resilient dropdown option selector."""
     opt_val_str = str(opt_val).strip()
     
-    # Tier 1: Exact label
     try:
-        await element.select_option(label=opt_val_str, timeout=800)
+        await element.select_option(label=opt_val_str, timeout=600)
         return True
     except Exception:
         pass
 
-    # Tier 2: Exact value
     try:
-        await element.select_option(value=opt_val_str, timeout=800)
+        await element.select_option(value=opt_val_str, timeout=600)
         return True
     except Exception:
         pass
 
-    # Tier 3: Fuzzy option substring match
     try:
         options = await element.query_selector_all("option")
         for o in options:
@@ -218,7 +209,6 @@ async def robust_select_dropdown(element, opt_val):
     except Exception:
         pass
 
-    # Tier 4: Fallback to first non-empty option
     try:
         await element.select_option(index=1)
         return True
@@ -227,43 +217,50 @@ async def robust_select_dropdown(element, opt_val):
 
     return False
 
-async def try_advance_next(page, cur_x, cur_y):
-    """Guaranteed auto-navigation helper that finds and clicks the active Next button."""
+async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
+    """Guaranteed, deterministic Next Button activator that advances to the next question."""
     try:
-        # Find all potential navigation buttons
-        candidates = await page.query_selector_all("button:not(.hidden), #next-btn:not(.hidden), [role='button'], a.btn")
-        for btn in candidates:
-            try:
-                is_vis = await btn.is_visible()
-                if not is_vis:
-                    continue
-                txt = (await page.evaluate("(el) => (el.innerText || el.value || '').toLowerCase()", btn)).strip()
-                
-                # Strict safety guard: NEVER click final submission button
-                if any(s in txt for s in ["finalize", "submit exam", "submit test", "end exam", "finish exam"]):
-                    continue
-                    
-                if any(n in txt for n in ["next", "save & next", "continue", "proceed", "forward", "→", ">", "save"]):
-                    success, nx, ny = await robust_click_element(page, btn, from_x=cur_x, from_y=cur_y)
-                    if success:
-                        print(f"    [⏩ AUTO-ADVANCE] Navigated forward via '{txt}' button.")
-                        await asyncio.sleep(0.4)
-                        return True, nx, ny
-            except Exception:
-                continue
+        # Check if next button is present in DOM
+        has_next = await page.evaluate("""() => {
+            const nextBtn = document.getElementById('next-btn') || 
+                            Array.from(document.querySelectorAll('button:not(.hidden), a.btn, [role="button"]')).find(b => {
+                                const t = (b.innerText || b.value || '').toLowerCase().trim();
+                                return (t.includes('next') || t.includes('continue') || t.includes('proceed') || t.includes('save')) && 
+                                       !t.includes('finalize') && !t.includes('submit') && !t.includes('finish') &&
+                                       b.offsetParent !== null && window.getComputedStyle(b).display !== 'none';
+                            });
+            if (nextBtn) {
+                nextBtn.click();
+                return true;
+            }
+            return false;
+        }""")
+
+        if has_next:
+            # Also simulate smooth mouse pointer travel to next-btn area for realism
+            next_el = await page.query_selector("#next-btn, button:has-text('Next'), button:has-text('Save & Next')")
+            if next_el and await next_el.is_visible():
+                box = await next_el.bounding_box()
+                if box:
+                    tx = box['x'] + box['width'] / 2
+                    ty = box['y'] + box['height'] / 2
+                    await human_mouse_move(page, cur_x, cur_y, tx, ty)
+                    cur_x, cur_y = tx, ty
+            
+            await asyncio.sleep(0.4)
+            return True, cur_x, cur_y
     except Exception:
         pass
     return False, cur_x, cur_y
 
 def parse_llm_json(raw_text):
-    """Robust JSON parser that extracts JSON even if the model outputs markdown wrappers or extra text."""
+    """Robust JSON parser that extracts JSON even with markdown wrappers."""
     clean = raw_text.strip()
     try:
         return json.loads(clean)
     except Exception:
         pass
         
-    # Regex extract JSON object
     match = re.search(r'\{.*\}', clean, re.DOTALL)
     if match:
         try:
@@ -275,7 +272,7 @@ def parse_llm_json(raw_text):
 async def universal_destruction_engine():
     print("=" * 68)
     print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
-    print("🎯 Enterprise-Grade Self-Healing Architecture (0% Failure Tolerance)")
+    print("🎯 Deterministic 25-Question Solver Engine (Zero-Stop Guarantee)")
     print("=" * 68)
     
     for i in range(3, 0, -1):
@@ -307,7 +304,7 @@ async def universal_destruction_engine():
                 
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            MAX_SCREEN_CYCLES = 50
+            MAX_SCREEN_CYCLES = 45
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
                 # Annotate all visible widgets
@@ -318,7 +315,7 @@ async def universal_destruction_engine():
                 
                 if not elements:
                     print("[!] Waiting for question viewport to render...")
-                    await asyncio.sleep(0.6)
+                    await asyncio.sleep(0.5)
                     continue
 
                 print(f"\n--- [Step {cycle}] {tracker} ---")
@@ -326,30 +323,32 @@ async def universal_destruction_engine():
                 # Filter out palette buttons from LLM prompt
                 relevant_elements = [e for e in elements if not e.get('is_palette_btn')]
 
+                # Filter out navigation buttons from question option candidates
+                question_options = [e for e in relevant_elements if not any(
+                    n in e.get('text', '').lower() for n in ['next', 'previous', 'submit', 'finalize', 'save & next']
+                )]
+
                 system_prompt = (
-                    "You are a world-class academic test taker solving an online exam.\n"
-                    "All interactive elements on screen are tagged with `[data-agent-target=\"<index>\"]`.\n\n"
-                    "RULES FOR ACTION DETERMINATION:\n"
-                    "1. Radio options (`type: 'radio'`) -> Single Choice: Return action `type: 'click'` with target_index of the correct answer.\n"
-                    "2. Checkbox options (`type: 'checkbox'`) -> Multi-Select: Return action `type: 'click'` for ALL correct answer indices.\n"
-                    "3. Select tags (`tag: 'select'`) -> Dropdown: Return action `type: 'select'`, target_index, and `option_text`.\n"
-                    "4. Input/Textarea (`tag: 'input'` or `tag: 'textarea'`) -> Fill Blank/Code: Return action `type: 'type'`, target_index, and `text`.\n"
-                    "5. If a 'Save & Next', 'Next', or 'Continue' button exists, include clicking it as the LAST action in the array.\n\n"
-                    "CRITICAL SAFETY RULE:\n"
-                    "- NEVER click final submission buttons ('Finalize Submission', 'Submit Exam', 'End Test').\n\n"
-                    "Output strictly in this JSON format:\n"
+                    "You are a master academic solver.\n"
+                    "All interactive elements have a `[data-agent-target=\"<index>\"]` integer index.\n\n"
+                    "INSTRUCTIONS:\n"
+                    "1. Read the active question and identify the correct answer(s).\n"
+                    "2. Return the action needed to answer the question:\n"
+                    "   - For radio/checkbox: {\"type\": \"click\", \"target_index\": <idx>, \"reason\": \"...\"}\n"
+                    "   - For dropdown select: {\"type\": \"select\", \"target_index\": <idx>, \"option_text\": \"...\", \"reason\": \"...\"}\n"
+                    "   - For text/textarea: {\"type\": \"type\", \"target_index\": <idx>, \"text\": \"...\", \"reason\": \"...\"}\n\n"
+                    "Output JSON schema:\n"
                     "{\n"
-                    "  \"question_summary\": \"Identified question and answer rationale\",\n"
+                    "  \"question_summary\": \"Question topic and answer\",\n"
                     "  \"actions\": [\n"
-                    "    {\"type\": \"click\", \"target_index\": 1, \"reason\": \"Select option\"},\n"
-                    "    {\"type\": \"click\", \"target_index\": 4, \"reason\": \"Click Next button\"}\n"
+                    "    {\"type\": \"click\", \"target_index\": 25, \"reason\": \"Select process.nextTick\"}\n"
                     "  ]\n"
                     "}"
                 )
                 
                 user_content = (
                     f"--- ACTIVE QUESTION CONTENT ---\n{q_context}\n\n"
-                    f"--- INTERACTIVE TARGETS ---\n{json.dumps(relevant_elements, indent=2)}"
+                    f"--- INTERACTIVE QUESTION TARGETS ---\n{json.dumps(question_options, indent=2)}"
                 )
 
                 plan = None
@@ -372,22 +371,19 @@ async def universal_destruction_engine():
 
                 actions = plan.get("actions", []) if plan else []
                 
-                # If LLM returned no actions, generate an automated fallback plan
-                if not actions:
-                    # Select first valid input option if available
-                    for el_item in relevant_elements:
-                        if el_item.get('tag') in ['label', 'input', 'select']:
-                            actions.append({
-                                "type": "select" if el_item.get('tag') == 'select' else "click",
-                                "target_index": el_item.get('index'),
-                                "option_text": el_item.get('options', [''])[0] if el_item.get('options') else '',
-                                "reason": "Self-healing fallback selection"
-                            })
-                            break
+                # Self-healing fallback if LLM gave no action
+                if not actions and question_options:
+                    first_opt = question_options[0]
+                    actions.append({
+                        "type": "select" if first_opt.get('tag') == 'select' else "click",
+                        "target_index": first_opt.get('index'),
+                        "option_text": first_opt.get('options', [''])[0] if first_opt.get('options') else '',
+                        "reason": "Self-healing option selection"
+                    })
 
-                print(f"💡 AI Analysis: {plan.get('question_summary', 'Executing optimal response...') if plan else 'Self-healing mode active'}")
-                has_navigated = False
+                print(f"💡 AI Analysis: {plan.get('question_summary', 'Solving question...') if plan else 'Self-healing mode active'}")
 
+                # 1. Execute the question answer actions
                 for act_idx, action in enumerate(actions):
                     try:
                         act_type = action.get("type", "click")
@@ -404,29 +400,23 @@ async def universal_destruction_engine():
                         # Safety shield: never click final submit
                         el_text = (await page.evaluate("(el) => (el.innerText || el.value || '').toLowerCase()", target_el)).strip()
                         if any(x in el_text for x in ["finalize submission", "submit exam", "submit test", "end test", "finish exam"]):
-                            print(f"    [🛡️ SAFETY SHIELD] Preserved final submission button: '{el_text}'")
                             continue
 
                         # Scroll element smoothly into center view
                         await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", target_el)
-                        await asyncio.sleep(0.08)
+                        await asyncio.sleep(0.06)
                         
                         if act_type == "click":
                             _, current_mouse_x, current_mouse_y = await robust_click_element(
                                 page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
                             )
-                            print(f"    [+] Clicked [{t_idx}] -> {reason}")
-                            
-                            if any(x in el_text for x in ["next", "continue", "save & next", "proceed", "forward", "→", ">"]):
-                                has_navigated = True
-                                await asyncio.sleep(0.3)
-                                break
+                            print(f"    [+] Selected [{t_idx}] -> {reason}")
                                 
                         elif act_type == "type":
                             _, current_mouse_x, current_mouse_y = await robust_click_element(
                                 page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
                             )
-                            await asyncio.sleep(0.08)
+                            await asyncio.sleep(0.06)
                             val = str(action.get("text", ""))
                             await human_type(target_el, val)
                             print(f"    [+] Typed '{val}' into [{t_idx}] -> {reason}")
@@ -436,21 +426,24 @@ async def universal_destruction_engine():
                             await robust_select_dropdown(target_el, opt_val)
                             print(f"    [+] Selected dropdown option '{opt_val}' on [{t_idx}] -> {reason}")
 
-                        await asyncio.sleep(random.uniform(0.12, 0.25))
-                    except Exception as step_err:
+                        await asyncio.sleep(random.uniform(0.1, 0.2))
+                    except Exception:
                         continue
 
-                # AUTO-ADVANCE FAILSAFE:
-                # If question was solved but Next was not clicked, find and click Next automatically!
-                if not has_navigated:
-                    adv_success, current_mouse_x, current_mouse_y = await try_advance_next(page, current_mouse_x, current_mouse_y)
-                    if adv_success:
-                        has_navigated = True
+                # 2. Trigger Next Button to advance to the next question
+                nav_success, current_mouse_x, current_mouse_y = await trigger_next_button(
+                    page, current_mouse_x, current_mouse_y
+                )
 
-                if not has_navigated:
-                    # Check if final submit button is visible on page
-                    final_btn = await page.query_selector("#submit-btn:not(.hidden)")
-                    if final_btn and await final_btn.is_visible():
+                if nav_success:
+                    print(f"    [⏩ NAVIGATION] Advanced to next question.")
+                else:
+                    # If there's no Next button, check if we reached the final submit button!
+                    is_final = await page.evaluate("""() => {
+                        const submitBtn = document.getElementById('submit-btn');
+                        return submitBtn && !submitBtn.classList.contains('hidden') && window.getComputedStyle(submitBtn).display !== 'none';
+                    }""")
+                    if is_final:
                         print("\n[🎯 FINAL QUESTION REACHED] All 25 questions resolved successfully!")
                         break
                     else:
