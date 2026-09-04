@@ -20,11 +20,22 @@ if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
 from playwright.async_api import async_playwright
 from groq import Groq
 
-# Verify GROQ_API_KEY environment variable
+# Verify GROQ_API_KEY environment variable or local .env file
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+if not GROQ_API_KEY and os.path.exists(".env"):
+    try:
+        with open(".env", "r", encoding="utf-8") as f:
+            for line in f:
+                line_str = line.strip()
+                if line_str.startswith("GROQ_API_KEY="):
+                    GROQ_API_KEY = line_str.split("=", 1)[1].strip(" \"'")
+    except Exception:
+        pass
+
 if not GROQ_API_KEY:
-    print("\n[!] FATAL ERROR: GROQ_API_KEY is not configured in your environment.")
-    print("[!] Run: set GROQ_API_KEY=your_key_here")
+    print("\n[!] FATAL ERROR: GROQ_API_KEY is not configured.")
+    print("[!] Quick Setup: set GROQ_API_KEY=your_groq_key")
+    print("[!] Or create a .env file with: GROQ_API_KEY=your_groq_key")
     sys.exit(1)
 
 client = Groq(api_key=GROQ_API_KEY)
