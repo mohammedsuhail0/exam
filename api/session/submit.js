@@ -52,8 +52,11 @@ module.exports = async (req, res) => {
 
   // Map all pool questions for fast lookup
   const allMap = new Map();
-  QUESTIONS_POOL.mcq.forEach(q => allMap.set(q.id, q));
-  QUESTIONS_POOL.fib.forEach(q => allMap.set(q.id, q));
+  if (QUESTIONS_POOL.mcq) QUESTIONS_POOL.mcq.forEach(q => allMap.set(q.id, q));
+  if (QUESTIONS_POOL.multi_mcq) QUESTIONS_POOL.multi_mcq.forEach(q => allMap.set(q.id, q));
+  if (QUESTIONS_POOL.dropdown) QUESTIONS_POOL.dropdown.forEach(q => allMap.set(q.id, q));
+  if (QUESTIONS_POOL.fib) QUESTIONS_POOL.fib.forEach(q => allMap.set(q.id, q));
+  if (QUESTIONS_POOL.textarea) QUESTIONS_POOL.textarea.forEach(q => allMap.set(q.id, q));
 
   const results = [];
   let correct = 0;

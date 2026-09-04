@@ -5,259 +5,354 @@ const QUESTIONS_POOL = {
     {
       id: "hard_mcq_1",
       type: "mcq",
-      text: "What is the primary mechanism of JavaScript's prototype inheritance?",
+      text: "In JavaScript V8 engine, what optimization transforms polymorphic property access into monomorphic inline caches (ICs)?",
       options: [
-        "Objects have a hidden pointer to their prototype object",
-        "Classes copy methods to instances during instantiation",
-        "Functions compile into static type schemas"
+        "Hidden classes (Shapes/Maps) transitions tracking",
+        "Eager JIT bytecode decompression",
+        "Stack-allocated prototype pinning"
       ],
-      answer: "Objects have a hidden pointer to their prototype object"
+      answer: "Hidden classes (Shapes/Maps) transitions tracking"
     },
     {
       id: "hard_mcq_2",
       type: "mcq",
-      text: "Which HTTP header is used to mitigate Clickjacking attacks?",
+      text: "Which HTTP header is strictly required to enable Cross-Origin Isolation for SharedArrayBuffer usage?",
       options: [
-        "Content-Security-Policy",
-        "X-Frame-Options",
-        "Referrer-Policy"
+        "Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp",
+        "Access-Control-Allow-Origin: * and Access-Control-Allow-Credentials: true",
+        "Content-Security-Policy: isolate-workers"
       ],
-      answer: "X-Frame-Options"
+      answer: "Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp"
     },
     {
       id: "hard_mcq_3",
       type: "mcq",
-      text: "What is the output of console.log(0.1 + 0.2 === 0.3) in JavaScript?",
+      text: "What is the output of `typeof (class {})` in JavaScript?",
       options: [
-        "true",
-        "false",
-        "undefined"
+        "function",
+        "object",
+        "class"
       ],
-      answer: "false"
+      answer: "function"
     },
     {
       id: "hard_mcq_4",
       type: "mcq",
-      text: "Which event loop phase executes setTimeout callbacks?",
+      text: "Which event loop microtask phase executes immediately after the current execution context stack empties but before rendering?",
       options: [
-        "Poll phase",
-        "Timers phase",
-        "Check phase"
+        "Microtask Queue (Promise callbacks and queueMicrotask)",
+        "Timers Phase (setTimeout / setInterval)",
+        "Check Phase (setImmediate)"
       ],
-      answer: "Timers phase"
+      answer: "Microtask Queue (Promise callbacks and queueMicrotask)"
     },
     {
       id: "hard_mcq_5",
       type: "mcq",
-      text: "What does the defer attribute do when loading a script tag?",
+      text: "What prevents prototype pollution attacks in modern JavaScript objects without prototypes?",
       options: [
-        "Downloads script asynchronously and executes it immediately",
-        "Downloads script in parallel and executes it after document parsing finishes",
-        "Blocks HTML parsing until script is downloaded and run"
+        "Creating objects with Object.create(null)",
+        "Freezing only the top-level keys with Object.freeze()",
+        "Using standard object literal syntax {}"
       ],
-      answer: "Downloads script in parallel and executes it after document parsing finishes"
+      answer: "Creating objects with Object.create(null)"
     },
     {
       id: "hard_mcq_6",
       type: "mcq",
-      text: "Which security policy prevents cross-site request forgery by restricting cookie transmission?",
+      text: "In OAuth 2.1 authorization code flow for public clients (SPAs), which mechanism prevents authorization code interception attacks?",
       options: [
-        "SameSite attribute",
-        "CORS policy",
-        "HttpOnly flag"
+        "PKCE (Proof Key for Code Exchange) with S256 code challenge",
+        "Client Secret rotation over mTLS",
+        "Implicit Token Grant in URL fragments"
       ],
-      answer: "SameSite attribute"
+      answer: "PKCE (Proof Key for Code Exchange) with S256 code challenge"
     },
     {
       id: "hard_mcq_7",
       type: "mcq",
-      text: "What is a closure in JavaScript?",
+      text: "How does JavaScript's `WeakMap` prevent memory leaks compared to a standard `Map`?",
       options: [
-        "A function combined with its lexical environment",
-        "A method to close database connections",
-        "A built-in method for private classes"
+        "Keys must be objects/symbols held weakly, allowing them to be garbage collected when unreachable elsewhere",
+        "Values are automatically evicted using an LRU cache algorithm",
+        "Keys are stored in Web Worker isolated heap memory"
       ],
-      answer: "A function combined with its lexical environment"
+      answer: "Keys must be objects/symbols held weakly, allowing them to be garbage collected when unreachable elsewhere"
     },
     {
       id: "hard_mcq_8",
       type: "mcq",
-      text: "Which CSS layout feature allows you to change element order visually without changing HTML?",
+      text: "Which CSS property establishes a new 'stacking context' without creating a new block formatting context (BFC)?",
       options: [
-        "order property in Flexbox/Grid",
-        "z-index stacking context",
-        "float alignment"
+        "isolation: isolate",
+        "overflow: hidden",
+        "display: flow-root"
       ],
-      answer: "order property in Flexbox/Grid"
+      answer: "isolation: isolate"
     },
     {
       id: "hard_mcq_9",
       type: "mcq",
-      text: "How does a Promise.all() block behave if one of the promises rejects?",
+      text: "What happens when `Promise.allSettled()` is executed on an array of promises where two reject?",
       options: [
-        "It immediately rejects with the error of the first rejected promise",
-        "It waits for all promises to settle and returns errors",
-        "It ignores the error and returns resolved ones"
+        "It resolves with an array of outcome objects describing each promise's status and value/reason",
+        "It rejects immediately with an AggregateError containing both rejection reasons",
+        "It hangs indefinitely waiting for manual rejection handling"
       ],
-      answer: "It immediately rejects with the error of the first rejected promise"
+      answer: "It resolves with an array of outcome objects describing each promise's status and value/reason"
     },
     {
       id: "hard_mcq_10",
       type: "mcq",
-      text: "Which browser mechanism restricts web page scripts from interacting with resources from a different origin?",
+      text: "Which HTTP/3 protocol innovation eliminates TCP Head-of-Line (HoL) blocking at the transport layer?",
       options: [
-        "Same-Origin Policy",
-        "Content Security Policy",
-        "Cross-Origin Resource Sharing"
+        "QUIC protocol operating over independent UDP streams",
+        "HPACK header table dynamic compression",
+        "TLS 1.3 0-RTT early data replication"
       ],
-      answer: "Same-Origin Policy"
+      answer: "QUIC protocol operating over independent UDP streams"
     },
     {
       id: "hard_mcq_11",
       type: "mcq",
-      text: "What is the purpose of the aria-live attribute in HTML?",
+      text: "What does the JavaScript `Reflect.apply(target, thisArgument, argumentsList)` method accomplish?",
       options: [
-        "To announce dynamic content updates to screen readers",
-        "To keep websocket connections alive",
-        "To speed up audio rendering"
+        "Calls a target function with specified this and arguments, behaving as Function.prototype.apply without prototype lookup hijacking",
+        "Compiles the function into WebAssembly bytecode",
+        "Clones the target function scope"
       ],
-      answer: "To announce dynamic content updates to screen readers"
+      answer: "Calls a target function with specified this and arguments, behaving as Function.prototype.apply without prototype lookup hijacking"
     },
     {
       id: "hard_mcq_12",
       type: "mcq",
-      text: "What is the purpose of a CSS transition-timing-function?",
+      text: "In CSS Grid, what does `grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))` do compared to `auto-fill`?",
       options: [
-        "To specify the speed curve of a transition effect",
-        "To delay the start of a transition",
-        "To control the duration of a transition"
+        "auto-fit collapses empty repeated tracks to 0px allowing remaining items to stretch to fill the container",
+        "auto-fit retains empty tracks maintaining fixed slot allocations",
+        "auto-fit creates masonry column breaks"
       ],
-      answer: "To specify the speed curve of a transition effect"
+      answer: "auto-fit collapses empty repeated tracks to 0px allowing remaining items to stretch to fill the container"
     },
     {
       id: "hard_mcq_13",
       type: "mcq",
-      text: "In JavaScript, what is 'temporal dead zone' (TDZ)?",
+      text: "What is the primary vulnerability prevented by the HTTP `X-Content-Type-Options: nosniff` header?",
       options: [
-        "The state before variable initialization where referencing it throws a ReferenceError",
-        "The duration when the browser event loop is blocked",
-        "The delay during service worker activation"
+        "MIME-type sniffing attacks where browsers execute non-executable files as script/css",
+        "Cross-site request forgery on multipart form uploads",
+        "DOM-based cross-site scripting via innerHTML"
       ],
-      answer: "The state before variable initialization where referencing it throws a ReferenceError"
+      answer: "MIME-type sniffing attacks where browsers execute non-executable files as script/css"
     },
     {
       id: "hard_mcq_14",
       type: "mcq",
-      text: "What is the difference between Object.freeze() and Object.seal()?",
+      text: "In JavaScript, what is the value of `[1, 2, 3] + [4, 5, 6]`?",
       options: [
-        "freeze prevents new properties and makes existing immutable; seal only prevents new properties",
-        "freeze only works on arrays; seal works on objects",
-        "seal prevents new properties and makes existing immutable; freeze only prevents new"
+        "'1,2,34,5,6'",
+        "[1, 2, 3, 4, 5, 6]",
+        "NaN"
       ],
-      answer: "freeze prevents new properties and makes existing immutable; seal only prevents new properties"
+      answer: "'1,2,34,5,6'"
     },
     {
       id: "hard_mcq_15",
       type: "mcq",
-      text: "What does the JavaScript bind() method return?",
+      text: "Which Web API allows background synchronization of data even if the user closes the web tab or browser?",
       options: [
-        "A new function with a pre-configured 'this' context",
-        "The immediate return value of the function",
-        "An array of bound variables"
+        "Service Worker Background Sync API",
+        "WebSockets Reconnect Worker",
+        "BroadcastChannel Synchronization"
       ],
-      answer: "A new function with a pre-configured 'this' context"
+      answer: "Service Worker Background Sync API"
     },
     {
       id: "hard_mcq_16",
       type: "mcq",
-      text: "Which algorithm does the Chrome V8 Garbage Collector use for its young generation?",
+      text: "What does the `Subresource Integrity (SRI)` hash check ensure during external script loading?",
       options: [
-        "Mark-Sweep-Compact",
-        "Scavenge ( Cheney's copying algorithm )",
-        "Reference Counting"
+        "Ensures fetched CDN resource has not been altered or tampered with by verifying its cryptographic hash",
+        "Encrypts payload transmission between CDN and client",
+        "Guarantees the script executes before DOMContentLoaded"
       ],
-      answer: "Scavenge ( Cheney's copying algorithm )"
+      answer: "Ensures fetched CDN resource has not been altered or tampered with by verifying its cryptographic hash"
     },
     {
       id: "hard_mcq_17",
       type: "mcq",
-      text: "What does a CSS 'BFC' (Block Formatting Context) prevent?",
+      text: "In React 18 Concurrent Mode, what does the `useDeferredValue` hook do?",
       options: [
-        "Margin collapsing between adjacent block boxes",
-        "Responsive styling overrides",
-        "Inline rendering of text blocks"
+        "Defers updating a secondary value until urgent UI updates (like typing inputs) have finished rendering",
+        "Delays network API requests using an automatic debounce timer",
+        "Prevents re-renders across parent component trees"
       ],
-      answer: "Margin collapsing between adjacent block boxes"
+      answer: "Defers updating a secondary value until urgent UI updates (like typing inputs) have finished rendering"
     },
     {
       id: "hard_mcq_18",
       type: "mcq",
-      text: "In React, what does the 'useTransition' hook help optimize?",
+      text: "What is the result of `Number.MIN_VALUE > 0` in JavaScript?",
       options: [
-        "CSS transition speed variations",
-        "Non-blocking rendering of state updates by keeping the UI responsive",
-        "Server-side component routing timings"
+        "true",
+        "false",
+        "TypeError"
       ],
-      answer: "Non-blocking rendering of state updates by keeping the UI responsive"
+      answer: "true"
     },
     {
       id: "hard_mcq_19",
       type: "mcq",
-      text: "Which of the following is true about HTTP/2 multiplexing?",
+      text: "Which CSS property modernizes container-based responsive design by querying parent component widths?",
       options: [
-        "It opens a separate TCP connection for every single asset request",
-        "It allows multiple request and response messages to be interleaved on a single TCP connection",
-        "It compresses headers using GZIP algorithm exclusively"
+        "@container / container-type: inline-size",
+        "@media (component-width)",
+        "flex-basis: auto-query"
       ],
-      answer: "It allows multiple request and response messages to be interleaved on a single TCP connection"
+      answer: "@container / container-type: inline-size"
     },
     {
       id: "hard_mcq_20",
       type: "mcq",
-      text: "What does a 'Critical Rendering Path' optimization aim to minimize?",
+      text: "In Cryptography, what is the main advantage of the ChaCha20-Poly1305 cipher suite over AES-GCM on mobile devices?",
       options: [
-        "Initial page weight by minifying Javascript packages",
-        "Time to first render by optimizing CSSOM and DOM construction dependencies",
-        "The total count of background API requests"
+        "Performs faster in software without requiring dedicated hardware AES instruction sets",
+        "Requires 4096-bit symmetric keys",
+        "Provides quantum-proof asymmetric key generation"
       ],
-      answer: "Time to first render by optimizing CSSOM and DOM construction dependencies"
+      answer: "Performs faster in software without requiring dedicated hardware AES instruction sets"
     },
+    {
+      id: "hard_mcq_21",
+      type: "mcq",
+      text: "What does the JavaScript `Structured Clone Algorithm` handle that `JSON.parse(JSON.stringify(obj))` fails on?",
+      options: [
+        "Circular references, Maps, Sets, Dates, and ArrayBuffers",
+        "Private class methods and closures",
+        "DOM Node clones with event listeners"
+      ],
+      answer: "Circular references, Maps, Sets, Dates, and ArrayBuffers"
+    },
+    {
+      id: "hard_mcq_22",
+      type: "mcq",
+      text: "In Node.js event loop, which queue has the highest priority and executes between every event loop transition?",
+      options: [
+        "process.nextTick() queue",
+        "setImmediate() check queue",
+        "setTimeout() timer queue"
+      ],
+      answer: "process.nextTick() queue"
+    },
+    {
+      id: "hard_mcq_23",
+      type: "mcq",
+      text: "What is the purpose of the HTTP `Clear-Site-Data` response header?",
+      options: [
+        "Instructs the browser to clear cookies, storage, cache, or execution contexts for the host origin",
+        "Forces an immediate DOM hard-refresh without service worker caching",
+        "Purges edge proxy server CDN caches"
+      ],
+      answer: "Instructs the browser to clear cookies, storage, cache, or execution contexts for the host origin"
+    },
+    {
+      id: "hard_mcq_24",
+      type: "mcq",
+      text: "In JavaScript, what does `Object.is(-0, +0)` return?",
+      options: [
+        "false",
+        "true",
+        "NaN"
+      ],
+      answer: "false"
+    },
+    {
+      id: "hard_mcq_25",
+      type: "mcq",
+      text: "Which browser security mechanism prevents CSS Exfiltration attacks that leak sensitive input values via attribute selectors?",
+      options: [
+        "Strict Content Security Policy (style-src nonce / strict CSP)",
+        "X-Frame-Options: SAMEORIGIN",
+        "CORS Preflight Options Header"
+      ],
+      answer: "Strict Content Security Policy (style-src nonce / strict CSP)"
+    }
+  ],
+  multi_mcq: [
     {
       id: "hard_multi_1",
       type: "multi_mcq",
-      text: "Select ALL headers that directly enhance web application security (Select all that apply):",
+      text: "Select ALL HTTP security headers that mitigate Cross-Site Scripting (XSS) or Data Exfiltration (Select all that apply):",
       options: [
         "Content-Security-Policy",
-        "Strict-Transport-Security",
-        "Accept-Encoding",
-        "User-Agent"
+        "X-Content-Type-Options: nosniff",
+        "Accept-Encoding: gzip",
+        "Cache-Control: public"
       ],
-      answer: ["Content-Security-Policy", "Strict-Transport-Security"]
+      answer: ["Content-Security-Policy", "X-Content-Type-Options: nosniff"]
     },
     {
       id: "hard_multi_2",
       type: "multi_mcq",
-      text: "Which of the following JavaScript features introduce block-scoped variables? (Select all that apply):",
+      text: "Which of the following JavaScript features introduce block-scoped bindings without creating window global properties? (Select all that apply):",
       options: [
-        "let",
-        "const",
-        "var",
-        "function"
+        "let declaration",
+        "const declaration",
+        "var declaration in global scope",
+        "function declaration in global scope"
       ],
-      answer: ["let", "const"]
+      answer: ["let declaration", "const declaration"]
     },
     {
       id: "hard_multi_3",
       type: "multi_mcq",
-      text: "Which of the following cause JavaScript microtasks to be queued? (Select all that apply):",
+      text: "Select ALL mechanisms that queue a JavaScript Microtask in modern browsers (Select all that apply):",
       options: [
-        "Promise.resolve().then()",
+        "Promise.prototype.then()",
         "queueMicrotask()",
-        "setTimeout()",
-        "setImmediate()"
+        "MutationObserver callback",
+        "setTimeout(..., 0)"
       ],
-      answer: ["Promise.resolve().then()", "queueMicrotask()"]
+      answer: ["Promise.prototype.then()", "queueMicrotask()", "MutationObserver callback"]
     },
+    {
+      id: "hard_multi_4",
+      type: "multi_mcq",
+      text: "Which of the following create a new Block Formatting Context (BFC) in CSS? (Select all that apply):",
+      options: [
+        "display: flow-root",
+        "overflow: hidden on non-inline element",
+        "float: left",
+        "position: static"
+      ],
+      answer: ["display: flow-root", "overflow: hidden on non-inline element", "float: left"]
+    },
+    {
+      id: "hard_multi_5",
+      type: "multi_mcq",
+      text: "Select ALL valid JSON data types supported by the ECMA-404 standard (Select all that apply):",
+      options: [
+        "Array",
+        "Boolean",
+        "Undefined",
+        "Function"
+      ],
+      answer: ["Array", "Boolean"]
+    },
+    {
+      id: "hard_multi_6",
+      type: "multi_mcq",
+      text: "Which cookie attributes directly defend against Cross-Site Request Forgery (CSRF) and XSS session theft? (Select all that apply):",
+      options: [
+        "SameSite=Strict (or Lax)",
+        "HttpOnly",
+        "Secure",
+        "Domain=*"
+      ],
+      answer: ["SameSite=Strict (or Lax)", "HttpOnly", "Secure"]
+    }
+  ],
+  dropdown: [
     {
       id: "hard_dropdown_1",
       type: "dropdown",
@@ -275,62 +370,118 @@ const QUESTIONS_POOL = {
       type: "dropdown",
       text: "Select the CSS property that forces sub-pixel font antialiasing in WebKit engines:",
       options: [
-        "-webkit-font-smoothing",
-        "text-rendering",
-        "font-variant",
-        "font-optical-sizing"
+        "-webkit-font-smoothing: antialiased",
+        "text-rendering: optimizeLegibility",
+        "font-variant: subpixel",
+        "font-optical-sizing: auto"
       ],
-      answer: "-webkit-font-smoothing"
+      answer: "-webkit-font-smoothing: antialiased"
+    },
+    {
+      id: "hard_dropdown_3",
+      type: "dropdown",
+      text: "Select the HTTP Status Code returned when an origin server rejects a CORS preflight request:",
+      options: [
+        "403 Forbidden",
+        "405 Method Not Allowed",
+        "401 Unauthorized",
+        "412 Precondition Failed"
+      ],
+      answer: "403 Forbidden"
+    },
+    {
+      id: "hard_dropdown_4",
+      type: "dropdown",
+      text: "Select the JavaScript Proxy trap handler used to intercept property access operations:",
+      options: [
+        "get(target, prop, receiver)",
+        "apply(target, thisArg, argArray)",
+        "construct(target, argArray)",
+        "has(target, prop)"
+      ],
+      answer: "get(target, prop, receiver)"
+    },
+    {
+      id: "hard_dropdown_5",
+      type: "dropdown",
+      text: "Select the CSS layout property that stops flex items from shrinking below their content size:",
+      options: [
+        "flex-shrink: 0",
+        "flex-grow: 1",
+        "flex-basis: max-content",
+        "align-self: stretch"
+      ],
+      answer: "flex-shrink: 0"
     }
   ],
   fib: [
     {
       id: "hard_fib_1",
       type: "fib",
-      text: "Fill in: In JavaScript, standard function context `this` is determined at ______ time.",
-      answer: ["runtime", "execution", "call"]
+      text: "Fill in: In JavaScript, standard function `this` binding is evaluated at ______ time (runtime/lexical/parse).",
+      answer: ["runtime", "call", "execution"]
     },
     {
       id: "hard_fib_2",
       type: "fib",
-      text: "Fill in: The CSS layout property that creates a new stacking context is z-______.",
-      answer: ["index"]
+      text: "Fill in: The CSS property that controls whether an element creates a 3D rendering context for children is transform-______: preserve-3d.",
+      answer: ["style"]
     },
     {
       id: "hard_fib_3",
       type: "fib",
-      text: "Fill in: The HTTP status code for 'Payload Too Large' is ______.",
+      text: "Fill in: The HTTP status code for 'Payload Too Large' (Request Entity Too Large) is ______.",
       answer: ["413"]
     },
     {
       id: "hard_fib_4",
       type: "fib",
-      text: "Fill in: The DOM method used to append a node as the last child of a parent is ______Child().",
-      answer: ["append"]
+      text: "Fill in: In cryptographic hashing, HMAC stands for Hash-based Message ______ Code.",
+      answer: ["Authentication", "authentication"]
     },
     {
       id: "hard_fib_5",
       type: "fib",
-      text: "Fill in: In JWT, the three parts are Header, Payload, and ______.",
-      answer: ["signature"]
+      text: "Fill in: In JSON Web Tokens (JWT), the three segments separated by dots are Header, Payload, and ______.",
+      answer: ["Signature", "signature"]
     },
     {
       id: "hard_fib_6",
       type: "fib",
-      text: "Fill in: The mechanism that hoists function declarations to the top of their scope is called ______.",
-      answer: ["hoisting"]
+      text: "Fill in: The V8 engine optimization compiler that produces machine code from bytecode is named Turbo______.",
+      answer: ["Fan", "fan", "turbofan", "Turbofan"]
     },
     {
       id: "hard_fib_7",
       type: "fib",
-      text: "Fill in: The CSS property used to control the wrapping behavior of flex items is flex-______.",
-      answer: ["wrap"]
+      text: "Fill in: In modern web networking, TLS stands for Transport Layer ______.",
+      answer: ["Security", "security"]
     },
+    {
+      id: "hard_fib_8",
+      type: "fib",
+      text: "Fill in: The JavaScript Symbol used to customize how an object converts to a primitive value is Symbol.to______.",
+      answer: ["Primitive", "primitive"]
+    }
+  ],
+  textarea: [
     {
       id: "hard_textarea_1",
       type: "textarea",
-      text: "Code Explanation: What is the exact keyword used in JavaScript to export a single default value from an ES module?",
-      answer: ["default", "export default"]
+      text: "Code Response: What is the exact keyword used in ES Modules to export a variable under a different alias name? (e.g. export { x ___ y })",
+      answer: ["as", "as keyword", "export as"]
+    },
+    {
+      id: "hard_textarea_2",
+      type: "textarea",
+      text: "Technical Term: What is the single word term for the security vulnerability where malicious script tags are injected into an application and stored in a database?",
+      answer: ["Stored XSS", "stored xss", "XSS", "Persistent XSS", "persistent xss"]
+    },
+    {
+      id: "hard_textarea_3",
+      type: "textarea",
+      text: "Architecture Term: In REST API design, what is the term for an operation where producing the same request multiple times has the exact same side-effects as a single request?",
+      answer: ["Idempotence", "idempotence", "Idempotent", "idempotent"]
     }
   ]
 };
@@ -341,13 +492,19 @@ function sample(arr, n) {
 }
 
 function getQuestionsForSession() {
-  const mcqs = sample(QUESTIONS_POOL.mcq, 20);
-  const fibs = sample(QUESTIONS_POOL.fib, 5);
+  // Balanced sample: 14 single MCQs + 3 multi-select MCQs + 3 Dropdowns + 3 FIBs + 2 Textareas = 25 Questions
+  const singleMcqs = sample(QUESTIONS_POOL.mcq, 14);
+  const multiMcqs = sample(QUESTIONS_POOL.multi_mcq, 3);
+  const dropdowns = sample(QUESTIONS_POOL.dropdown, 3);
+  const fibs = sample(QUESTIONS_POOL.fib, 3);
+  const textareas = sample(QUESTIONS_POOL.textarea, 2);
 
-  const selected = [...mcqs, ...fibs];
+  const selected = [...singleMcqs, ...multiMcqs, ...dropdowns, ...fibs, ...textareas];
+  // Shuffle overall question order so formats are interwoven!
+  const randomizedList = selected.sort(() => 0.5 - Math.random());
 
-  // Client-safe questions mapping
-  const clientSafe = selected.map((q) => {
+  // Client-safe questions mapping (strip answers)
+  const clientSafe = randomizedList.map((q) => {
     const item = {
       id: q.id,
       text: q.text,
@@ -360,7 +517,7 @@ function getQuestionsForSession() {
   });
 
   return {
-    questionIds: selected.map((q) => q.id),
+    questionIds: randomizedList.map((q) => q.id),
     questions: clientSafe
   };
 }
@@ -368,8 +525,12 @@ function getQuestionsForSession() {
 function getCorrectAnswers(questionIds) {
   const answerKey = {};
   const allMap = new Map();
+  
   QUESTIONS_POOL.mcq.forEach(q => allMap.set(q.id, q));
+  QUESTIONS_POOL.multi_mcq.forEach(q => allMap.set(q.id, q));
+  QUESTIONS_POOL.dropdown.forEach(q => allMap.set(q.id, q));
   QUESTIONS_POOL.fib.forEach(q => allMap.set(q.id, q));
+  QUESTIONS_POOL.textarea.forEach(q => allMap.set(q.id, q));
 
   for (const id of questionIds) {
     const q = allMap.get(id);
