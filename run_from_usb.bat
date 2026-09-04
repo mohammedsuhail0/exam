@@ -5,13 +5,7 @@ color 0A
 
 cls
 echo ==============================================================================
-echo   ____  _   _    _    ____  _____  ___  ____  _____     _    ____ _____ _   _ _____ 
-echo  / ___^| ^| ^| ^| ^|  / \  ^|  _ \^|_   _^|/ _ \^|  _ \^|_   _^|   / \  / ___^| ____^| \ ^| ^|_   _^|
-echo  \___ \^| ^|_^| ^| / _ \ ^| ^|_) ^| ^| ^| ^| ^| ^| ^|_) ^| ^| ^|    / _ \^| ^|  _^|  _^| ^|  \^| ^| ^| ^|  
-echo   ___) ^|  _  ^|/ ___ \^|  _ ^<  ^| ^| ^| ^|_^| ^|  _ ^<  ^| ^|   / ___ \ ^|_^| ^| ^|___^| ^|\  ^| ^| ^|  
-echo  ^|____/^|_^| ^|_/_/   \_\_^| \_\ ^|_^|  \___/^|_^| \_\ ^|_^|  /_/   \_\____^|_____^|_^| \_^| ^|_^|  
-echo ==============================================================================
-echo          [ UNIVERSAL ONE-CLICK USB AUTONOMOUS AGENT DEPLOYER ]
+echo   AUTONOMOUS ZERO-TOLERANCE AGENT - UNIVERSAL USB DEPLOYER
 echo ==============================================================================
 echo.
 
@@ -35,18 +29,22 @@ echo ---------------------------------------------------------------------------
 if defined GROQ_API_KEY (
     echo [OK] Detected existing GROQ_API_KEY in environment.
 ) else (
-    echo Enter your Groq API Key (starts with gsk_...):
+    echo Enter your Groq API Key:
     set /p USER_API_KEY="API Key: "
     set "GROQ_API_KEY=!USER_API_KEY!"
 )
-echo GROQ_API_KEY=!GROQ_API_KEY! > .env
-echo [OK] API Key configured.
+if "!GROQ_API_KEY!"=="" (
+    echo [!] Note: No key typed, checking for .env file...
+) else (
+    echo GROQ_API_KEY=!GROQ_API_KEY! > .env
+    echo [OK] API Key saved to .env
+)
 echo.
 
 :: 3. INSTALL PYTHON LIBRARIES
 echo [*] Step 3/5: Verifying AI Agent Dependencies...
 python -m pip install --quiet playwright groq
-echo [OK] All required packages (Playwright, Groq) ready!
+echo [OK] Required packages verified.
 echo.
 
 :: 4. LOCATE AND LAUNCH CHROME ON PORT 9222
@@ -64,7 +62,7 @@ if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
 )
 
 if "!CHROME_BIN!"=="" (
-    echo [!] Chrome not found in standard paths. Attempting default 'chrome' command...
+    echo [!] Launching default Chrome...
     start "" chrome --remote-debugging-port=9222 --user-data-dir="C:\ChromeDebugProfile" "https://secure-online-exam-portal-zt.vercel.app/"
 ) else (
     start "" "!CHROME_BIN!" --remote-debugging-port=9222 --user-data-dir="C:\ChromeDebugProfile" "https://secure-online-exam-portal-zt.vercel.app/"
@@ -80,5 +78,5 @@ python execute_agent.py
 
 echo.
 echo ==============================================================================
-echo [OK] Execution completed. Press any key to exit.
+echo [OK] Execution session complete. Press any key to exit.
 pause >nul
