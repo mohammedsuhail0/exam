@@ -3,10 +3,9 @@ import os
 import random
 import json
 import math
+import sys
 from playwright.async_api import async_playwright
 from groq import Groq
-
-import sys
 
 # Free Groq Developer token pipeline setup
 if not os.environ.get("GROQ_API_KEY"):
@@ -14,33 +13,30 @@ if not os.environ.get("GROQ_API_KEY"):
     print("[!] Please set it in your terminal using: set GROQ_API_KEY=your_key_here")
     sys.exit(1)
 
-async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=15):
-    """Moves the mouse from (from_x, from_y) to (to_x, to_y) using a curved path with slight noise."""
+async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=14):
+    """Moves mouse from (from_x, from_y) to (to_x, to_y) using smooth cubic Bezier curve with micro tremors."""
     for i in range(1, steps + 1):
         t = i / steps
-        # Simple cubic interpolation for smooth deceleration/acceleration
         t_curved = t * t * (3 - 2 * t)
         
         cx = from_x + (to_x - from_x) * t_curved
         cy = from_y + (to_y - from_y) * t_curved
         
-        # Add slight curve arc and micro hand shake
-        arc = math.sin(t * math.pi) * 12.0 * (random.random() - 0.5)
-        noise_x = random.uniform(-1.0, 1.0)
-        noise_y = random.uniform(-1.0, 1.0)
+        arc = math.sin(t * math.pi) * 10.0 * (random.random() - 0.5)
+        noise_x = random.uniform(-0.8, 0.8)
+        noise_y = random.uniform(-0.8, 0.8)
         
         await page.mouse.move(cx + arc + noise_x, cy + arc + noise_y)
-        await asyncio.sleep(random.uniform(0.01, 0.018))
+        await asyncio.sleep(random.uniform(0.012, 0.022))
     
-    # Settle at the exact target coordinates
     await page.mouse.move(to_x, to_y)
 
 async def human_type(input_field, text):
-    """Types text character-by-character simulating human speed, capitalization lag, and occasional typos."""
+    """Types text with realistic timing, capitalization latency, punctuation pauses, and occasional typos."""
     await input_field.focus()
     
     for char in text:
-        # 1. Occasional typo correction (approx 2% chance on letters)
+        # 1. Occasional typo correction (2% chance)
         if char.isalnum() and random.random() < 0.02:
             typos = {
                 'a': 's', 's': 'd', 'd': 'f', 'f': 'g', 'g': 'h', 'h': 'j', 'j': 'k', 'k': 'l',
@@ -50,28 +46,77 @@ async def human_type(input_field, text):
             typo_char = typos.get(char.lower(), char)
             await input_field.press(typo_char)
             await asyncio.sleep(random.uniform(0.08, 0.14))
-            
-            # Pause in realization of mistake, then hit Backspace
-            await asyncio.sleep(random.uniform(0.18, 0.28))
+            await asyncio.sleep(random.uniform(0.18, 0.25))
             await input_field.press("Backspace")
-            await asyncio.sleep(random.uniform(0.1, 0.16))
+            await asyncio.sleep(random.uniform(0.09, 0.15))
             
-        # 2. Keystroke timing with variance
-        delay = random.uniform(0.07, 0.15)
-        
-        # Capitalization / special character shift key latency
+        delay = random.uniform(0.06, 0.13)
         if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?':
-            delay += random.uniform(0.06, 0.12)
-            
-        # Spacer / punctuation pause
+            delay += random.uniform(0.07, 0.14)
         if char in " ,.?!;":
-            delay += random.uniform(0.14, 0.28)
+            delay += random.uniform(0.12, 0.25)
             
         await input_field.press(char)
         await asyncio.sleep(delay)
 
+# Script to tag all visible interactive elements across the screen
+ANNOTATE_SCREEN_SCRIPT = """
+() => {
+    document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
+    
+    const candidates = Array.from(document.querySelectorAll(
+        'input, textarea, select, button, label, [role="button"], [role="checkbox"], [role="radio"], [role="option"], [contenteditable="true"], a'
+    ));
+    
+    const visibleElements = [];
+    let targetCounter = 0;
+    
+    for (const el of candidates) {
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            continue;
+        }
+        if (rect.width <= 0 || rect.height <= 0) {
+            continue;
+        }
+        
+        // Exclude elements outside reasonable screen bounds
+        if (rect.bottom < 0 || rect.top > window.innerHeight * 3) {
+            continue;
+        }
+        
+        el.setAttribute('data-agent-target', String(targetCounter));
+        
+        let textContent = (el.innerText || el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim();
+        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 100);
+        
+        visibleElements.push({
+            index: targetCounter,
+            tag: el.tagName.toLowerCase(),
+            type: el.getAttribute('type') || '',
+            name: el.getAttribute('name') || '',
+            text: textContent,
+            checked: el.checked || false,
+            disabled: el.disabled || false
+        });
+        
+        targetCounter++;
+    }
+    
+    // Extract main visible text body for holistic comprehension
+    const pageText = (document.body.innerText || '').substring(0, 6000);
+    
+    return {
+        elements: visibleElements,
+        html_snapshot: document.body.innerHTML.substring(0, 20000),
+        page_text: pageText
+    };
+}
+"""
+
 async def universal_destruction_engine():
-    # Priority list of models on Groq with fallback
     CANDIDATE_MODELS = [
         "openai/gpt-oss-120b",
         "qwen/qwen3.8-27b",
@@ -81,19 +126,18 @@ async def universal_destruction_engine():
     ]
     client = Groq()
 
-    print("=" * 60)
-    print("[*] SYSTEM ACTIVE: UNIVERSAL ANNOTATION-BASED HUMANIZED SOLVER.")
-    print("[*] Simulating realistic pointer curves and dynamic target annotation...")
-    print("=" * 60)
+    print("=" * 65)
+    print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
+    print("🎯 Full-Viewport Visual Reasoning + Layout Agnostic Action Planning")
+    print("=" * 65)
     
-    for i in range(5, 0, -1):
-        print(f"Executing injection sequence in: {i} seconds...", end="\r")
+    for i in range(4, 0, -1):
+        print(f"[*] Attaching to Chrome CDP session in: {i}s...", end="\r")
         await asyncio.sleep(1)
-    print("\n\n[*] Initiating connection pipeline...")
+    print("\n[*] Connection established. Listening to active browser viewport...")
 
-    # Start mouse coordinates (simulating cursor starting somewhere natural)
-    current_mouse_x = 200.0
-    current_mouse_y = 200.0
+    current_mouse_x = 250.0
+    current_mouse_y = 250.0
 
     async with async_playwright() as p:
         try:
@@ -102,207 +146,157 @@ async def universal_destruction_engine():
             all_pages = default_context.pages
             
             if not all_pages:
-                raise Exception("No active browser tabs discovered on port 9222.")
+                raise Exception("No active browser tabs found on port 9222.")
             
-            # Locate the currently active/visible tab
+            # Find the currently visible tab
             page = all_pages[0]
             for p_target in all_pages:
                 try:
-                    is_visible = await p_target.evaluate("document.visibilityState === 'visible'")
-                    if is_visible:
+                    if await p_target.evaluate("document.visibilityState === 'visible'"):
                         page = p_target
                         break
                 except:
                     pass
                 
-            print(f"[+] Successfully linked to active target window context: {page.url}")
+            print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            # Locate all standalone card structures (questions) on the screen using generic layout mapping
-            find_containers_script = """
-            () => {
-                // Remove previous temporary classes
-                document.querySelectorAll('.data-agent-question').forEach(el => el.classList.remove('data-agent-question'));
-                
-                // 1. Try standard container selectors
-                let containers = Array.from(document.querySelectorAll('.card, fieldset, .question, .quiz-question, [id*="question"], [class*="question"]'));
-                
-                if (containers.length === 0) {
-                    // 2. Fallback: Group inputs by name (for radio/checkboxes) or closest parent
-                    const inputs = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
-                    const groups = {};
-                    inputs.forEach(input => {
-                        const name = input.name || 'unnamed';
-                        if (!groups[name]) groups[name] = [];
-                        groups[name].push(input);
-                    });
-                    
-                    const LCA_containers = new Set();
-                    Object.values(groups).forEach(groupInputs => {
-                        if (groupInputs.length === 0) return;
-                        let parent = groupInputs[0].parentElement;
-                        while (parent) {
-                            const containsAll = groupInputs.every(el => parent.contains(el));
-                            if (containsAll) {
-                                if (parent.tagName === 'BODY' || parent.tagName === 'HTML' || parent.tagName === 'FORM') {
-                                    break;
-                                }
-                                LCA_containers.add(parent);
-                                break;
-                            }
-                            parent = parent.parentElement;
-                        }
-                    });
-                    
-                    // Add text inputs/textareas
-                    const textInputs = Array.from(document.querySelectorAll('input[type="text"], textarea, [contenteditable="true"]'));
-                    textInputs.forEach(input => {
-                        const container = input.parentElement?.parentElement || input.parentElement;
-                        if (container && container.tagName !== 'BODY') {
-                            LCA_containers.add(container);
-                        }
-                    });
-                    
-                    containers = Array.from(LCA_containers);
-                }
-                
-                if (containers.length === 0) {
-                    // 3. Absolute fallback: leaf divs containing any input
-                    containers = Array.from(document.querySelectorAll('div')).filter(div => {
-                        return div.querySelector('input, textarea, select') && !div.querySelector('div');
-                    });
-                }
-                
-                // Add the helper class to all found containers
-                containers.forEach(el => el.classList.add('data-agent-question'));
-            }
-            """
+            # Autonomous Perception-Action Loop
+            MAX_SCREEN_CYCLES = 40
+            completed_questions = set()
             
-            # Execute class tagging in browser context
-            await page.evaluate(find_containers_script)
-            
-            # Locate all tagged questions using standard Playwright selectors
-            question_cards = await page.query_selector_all('.data-agent-question')
-            print(f"[+] Discovered {len(question_cards)} distinct question containers on this workspace.")
+            for cycle in range(1, MAX_SCREEN_CYCLES + 1):
+                print(f"\n--- [Screen Observation Cycle #{cycle}] ---")
+                
+                # Snapshot the screen and annotate all interactive widgets
+                screen_state = await page.evaluate(ANNOTATE_SCREEN_SCRIPT)
+                elements = screen_state.get('elements', [])
+                page_text = screen_state.get('page_text', '')
+                
+                if not elements:
+                    print("[!] No interactive elements discovered on screen. Waiting...")
+                    await asyncio.sleep(1.5)
+                    continue
 
-            # JavaScript to annotate interactive elements inside a card
-            annotate_script = """
-            (card) => {
-                // Clear any previous annotations first
-                card.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
+                # Query Groq Multimodal Reasoning Model for whole-screen perception
+                system_prompt = (
+                    "You are a master academic test taker examining an active screen of an online exam.\n"
+                    "All interactive elements on the screen have been annotated with a `[data-agent-target=\"<index>\"]` index.\n\n"
+                    "Your mission:\n"
+                    "1. Understand the questions, instructions, and widgets currently visible on screen.\n"
+                    "2. Determine the correct answers with 100% academic precision (MCQs, Checkboxes, Fill-in-the-blanks, Dropdowns, Coding).\n"
+                    "3. Return a list of sequential actions to perform.\n\n"
+                    "CRITICAL SAFETY RULE:\n"
+                    "- NEVER click the FINAL exam submission buttons (e.g. 'Finalize Submission', 'Submit Exam', 'End Test', 'Finish Exam').\n"
+                    "- DO click 'Next', 'Save & Next', 'Continue', 'Proceed' to move between questions if this is a paginated exam.\n\n"
+                    "Output format must be strictly a JSON object with this schema:\n"
+                    "{\n"
+                    "  \"screen_summary\": \"Brief 1-sentence description of what is on screen right now\",\n"
+                    "  \"actions\": [\n"
+                    "    {\"type\": \"click\", \"target_index\": 3, \"reason\": \"Select option (A) for Question 1\"},\n"
+                    "    {\"type\": \"type\", \"target_index\": 6, \"text\": \"let\", \"reason\": \"Fill in the blank for Question 2\"},\n"
+                    "    {\"type\": \"click\", \"target_index\": 12, \"reason\": \"Click Next button to go to next page\"}\n"
+                    "  ],\n"
+                    "  \"is_exam_complete\": false\n"
+                    "}"
+                )
                 
-                // Find all potential interactive elements
-                const interactive = Array.from(card.querySelectorAll('input, label, button, select, option, [role="button"], a, [contenteditable="true"]'));
-                
-                // Filter to only visible elements to keep it clean
-                const visible = interactive.filter(el => {
-                    const rect = el.getBoundingClientRect();
-                    return rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).display !== 'none';
-                });
-                
-                visible.forEach((el, idx) => {
-                    el.setAttribute('data-agent-target', String(idx));
-                });
-                
-                return card.outerHTML;
-            }
-            """
+                user_content = (
+                    f"URL: {page.url}\n\n"
+                    f"--- VISIBLE SCREEN TEXT ---\n{page_text}\n\n"
+                    f"--- ANNOTATED INTERACTIVE WIDGETS ---\n{json.dumps(elements, indent=2)}"
+                )
 
-            # Loop through every single question sequentially on your display monitor
-            for index, card in enumerate(question_cards):
-                print(f"\n[*] Solving Target Element [{index + 1}/{len(question_cards)}]...")
-                
-                # Scroll the current question into clear viewport focus
-                await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", card)
-                await asyncio.sleep(0.5)
-                
-                # Annotate the card dynamically in the browser DOM and get its HTML
-                annotated_html = await page.evaluate(annotate_script, card)
-                
-                # Query the AI with candidate model fallback
-                data_packet = None
+                plan = None
                 for model_name in CANDIDATE_MODELS:
                     try:
-                        response = client.chat.completions.create(
+                        resp = client.chat.completions.create(
                             model=model_name,
                             response_format={"type": "json_object"},
                             messages=[
-                                {
-                                    "role": "system", 
-                                    "content": (
-                                        "You are an automated academic solver parsing a single-question HTML node. "
-                                        "The HTML elements have been annotated with a 'data-agent-target' attribute containing a number.\n\n"
-                                        "Your goal is to solve the question and identify which annotated element needs to be clicked or typed into.\n\n"
-                                        "Determine if this is a multiple-choice selection or a text-entry fill-in-the-blank question.\n\n"
-                                        "Output your response strictly as a JSON object with these keys:\n"
-                                        "1. 'type': 'selection' or 'text'\n"
-                                        "2. 'target_index': The integer (or string representation of the integer) in the 'data-agent-target' attribute of the element that should be clicked (for selection) or focused (for text input).\n"
-                                        "3. 'target_string': (Only for text type) The exact text string that should be typed into the input field.\n\n"
-                                        "Example for selection:\n"
-                                        "{\"type\": \"selection\", \"target_index\": 1}\n\n"
-                                        "Example for text:\n"
-                                        "{\"type\": \"text\", \"target_index\": 3, \"target_string\": \"client\"}"
-                                    )
-                                },
-                                {"role": "user", "content": f"Solve this single item code container:\n{annotated_html}"}
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_content}
                             ]
                         )
-                        data_packet = json.loads(response.choices[0].message.content.strip())
+                        plan = json.loads(resp.choices[0].message.content.strip())
                         break
-                    except Exception as model_err:
-                        # Fallback to next model if model not found or unavailable
+                    except Exception as e:
                         continue
 
-                if not data_packet:
-                    print("    [!] Failed to solve element: All reasoning models failed or unavailable.")
-                    continue
+                if not plan or not plan.get("actions"):
+                    print("[*] No further actions required on this screen.")
+                    if plan and plan.get("is_exam_complete"):
+                        print("[*] Screen analysis indicates exam questions are complete.")
+                        break
+                    await asyncio.sleep(1.0)
+                    break
 
-                target_index = str(data_packet.get('target_index', ''))
-                action_type = data_packet.get('type')
-                
-                print(f"    [+] Solved Action -> Type: {action_type}, Target Element Index: '{target_index}'")
+                print(f"👁️  Screen Analysis: {plan.get('screen_summary', 'Processing screen...')}")
+                actions = plan.get("actions", [])
+                print(f"📋 Generated Action Plan: {len(actions)} steps")
 
-                if not target_index:
-                    print("    [!] Warning: No target index returned by solver. Skipping.")
-                    continue
-
-                # Locate the annotated target element inside the card
-                target_el = await card.query_selector(f'[data-agent-target="{target_index}"]')
-                if not target_el:
-                    print(f"    [!] Warning: Element with data-agent-target=\"{target_index}\" not found in card. Skipping.")
-                    continue
-
-                box = await target_el.bounding_box()
-                if not box:
-                    print("    [!] Warning: Target element is not visible or has no bounding box. Skipping.")
-                    continue
-
-                target_x = box['x'] + box['width'] / 2
-                target_y = box['y'] + box['height'] / 2
-
-                # Simulate human mouse move to the target element
-                await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
-                current_mouse_x, current_mouse_y = target_x, target_y
-
-                if action_type == 'selection':
-                    await page.mouse.click(target_x, target_y)
-                    print(f"    [+] Humanized Click on element [{target_index}] at ({target_x:.1f}, {target_y:.1f})")
-
-                elif action_type == 'text':
-                    await page.mouse.click(target_x, target_y)
-                    await asyncio.sleep(random.uniform(0.1, 0.2))
+                has_navigation = False
+                for step_idx, action in enumerate(actions):
+                    act_type = action.get("type")
+                    t_idx = str(action.get("target_index", ""))
+                    reason = action.get("reason", "")
                     
-                    await human_type(target_el, data_packet.get('target_string', ''))
-                    print(f"    [+] Injected Humanized Keystrokes for: '{data_packet.get('target_string')}'")
+                    if not t_idx:
+                        continue
+                        
+                    target_el = await page.query_selector(f'[data-agent-target="{t_idx}"]')
+                    if not target_el:
+                        continue
+                        
+                    # Hardcoded safeguard against premature final submission
+                    el_text = (await page.evaluate("(el) => (el.innerText || el.value || '').toLowerCase()", target_el)).strip()
+                    if any(x in el_text for x in ["finalize submission", "submit exam", "submit test", "end test", "finish exam"]):
+                        print(f"    [🛡️ SAFETY SHIELD] Blocked automated click on final submission button: '{el_text}'")
+                        continue
 
-                # Natural pause between solving questions
-                await asyncio.sleep(random.uniform(1.2, 2.4))
+                    # Scroll element smoothly into center view
+                    await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", target_el)
+                    await asyncio.sleep(0.3)
+                    
+                    box = await target_el.bounding_box()
+                    if not box:
+                        continue
+                        
+                    target_x = box['x'] + box['width'] / 2
+                    target_y = box['y'] + box['height'] / 2
+                    
+                    # Human mouse trajectory
+                    await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
+                    current_mouse_x, current_mouse_y = target_x, target_y
+                    
+                    if act_type == "click":
+                        await page.mouse.click(target_x, target_y)
+                        print(f"    [Step {step_idx+1}] Clicked [{t_idx}] -> {reason}")
+                        if any(x in el_text for x in ["next", "continue", "save & next", "proceed", "forward"]):
+                            has_navigation = True
+                            await asyncio.sleep(1.2)
+                            break
+                            
+                    elif act_type == "type":
+                        await page.mouse.click(target_x, target_y)
+                        await asyncio.sleep(0.1)
+                        text_to_type = action.get("text", "")
+                        await human_type(target_el, text_to_type)
+                        print(f"    [Step {step_idx+1}] Typed '{text_to_type}' into [{t_idx}] -> {reason}")
 
-            print("\n[SUCCESS] CRITICAL SUCCESS: Every single question container resolved with a 0% skip footprint.")
-            print("[*] Screen state pristine. You can safely review and finalize the test submission manually.")
+                    await asyncio.sleep(random.uniform(0.6, 1.2))
+
+                # If this was a single page exam without paginated buttons, we are done
+                if not has_navigation:
+                    print("\n[+] Single-page / All visible questions resolved.")
+                    break
+
+            print("\n" + "=" * 65)
+            print("🎉 [SUCCESS] AUTONOMOUS AGENT SOLVING RUN COMPLETE")
+            print("🛡️  All questions answered. Submit button left untouched for manual review.")
+            print("=" * 65)
 
         except Exception as e:
-            print(f"\n[X] Terminal Automation Failure: {str(e)}")
-            print("[!] Verify Chrome debugging profile is active before script launch.")
+            print(f"\n[X] Automation Error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(universal_destruction_engine())
