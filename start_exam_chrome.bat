@@ -1,6 +1,0 @@
-@echo off
-echo [1/2] Closing background Chrome...
-taskkill /F /IM chrome.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
-echo [2/2] Launching Chrome on Port 9222...
-start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\ChromeDebugProfile" "https://secure-online-exam-portal-zt.vercel.app/"

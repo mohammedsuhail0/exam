@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
-title Autonomous Assessment Agent - Universal USB Deployment Kit
+title Autonomous Assessment Agent - Universal Deployer
 color 0A
 
 cls
 echo ==============================================================================
-echo   AUTONOMOUS SCREEN-AWARE AGENT - UNIVERSAL USB DEPLOYER
+echo   AUTONOMOUS SCREEN-AWARE AGENT - UNIVERSAL DEPLOYER
 echo ==============================================================================
 echo.
 

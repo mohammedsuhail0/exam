@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title Autonomous Agent - Laptop Local Installer
+title Autonomous Assessment Agent - Local Laptop Installer
 color 0A
 
 cls
@@ -20,7 +20,7 @@ echo.
 echo [*] Step 2/3: Copying full autonomous suite from USB to local hard drive...
 set "USB_SOURCE=%~dp0"
 
-robocopy "%USB_SOURCE%" "%TARGET_DIR%" /E /XD .git .vercel __pycache__ /XF *.pyc install_to_laptop.bat >nul 2>&1
+robocopy "%USB_SOURCE%\" "%TARGET_DIR%\" /E /XD .git .vercel __pycache__ Autonomous_Exam_Agent /XF *.pyc install_to_laptop.bat >nul 2>&1
 
 echo [OK] All agent modules, solvers, and dependencies copied successfully!
 echo.
@@ -34,5 +34,5 @@ echo Press ANY KEY to launch the Autonomous Agent directly from this laptop...
 pause >nul
 
 cd /d "%TARGET_DIR%"
-start "" cmd /c "run_from_usb.bat"
+start "" cmd /c "run_agent.bat"
 exit
