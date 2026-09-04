@@ -106,33 +106,31 @@ async def human_type(input_field, text):
 
 ANNOTATE_SCREEN_SCRIPT = """
 () => {
-    // 1. Inspect screen states
-    const isTerminated = document.getElementById('terminated-screen') && 
-                         !document.getElementById('terminated-screen').classList.contains('hidden') &&
-                         window.getComputedStyle(document.getElementById('terminated-screen')).display !== 'none';
-                         
-    const isResult = document.getElementById('result-screen') && 
-                     !document.getElementById('result-screen').classList.contains('hidden') &&
-                     window.getComputedStyle(document.getElementById('result-screen')).display !== 'none';
-                     
-    const isStart = document.getElementById('start-screen') && 
-                    !document.getElementById('start-screen').classList.contains('hidden') &&
-                    window.getComputedStyle(document.getElementById('start-screen')).display !== 'none';
-                    
+    // 1. Universal screen state detection
+    const fullText = (document.body.innerText || '').toLowerCase();
+    
+    // Check for termination / violation screen
+    const isTerminated = (
+        (document.getElementById('terminated-screen') && !document.getElementById('terminated-screen').classList.contains('hidden') && window.getComputedStyle(document.getElementById('terminated-screen')).display !== 'none') ||
+        (fullText.includes('session terminated') || fullText.includes('security violation') || fullText.includes('access revoked') || fullText.includes('exam terminated'))
+    );
+    
+    // Check for results / finished screen
+    const isResult = (
+        (document.getElementById('result-screen') && !document.getElementById('result-screen').classList.contains('hidden') && window.getComputedStyle(document.getElementById('result-screen')).display !== 'none') ||
+        (fullText.includes('exam result') || fullText.includes('assessment submitted') || fullText.includes('responses have been recorded') || fullText.includes('submission accepted'))
+    );
+
     if (isTerminated) return { state: 'terminated' };
     if (isResult) return { state: 'result' };
-    if (isStart) return { state: 'start' };
 
+    // Strip previous agent markers
     document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
     
-    const activeViewport = document.getElementById('question-card-viewport') || document.querySelector('.panel:not(.hidden)') || document.body;
-    
-    const rawCandidates = Array.from(activeViewport.querySelectorAll(
-        'button, label, select, input:not([type="hidden"]), textarea, [role="button"], [role="checkbox"], [role="radio"], [contenteditable="true"]'
+    // 2. Universal interactive candidates
+    const rawCandidates = Array.from(document.querySelectorAll(
+        'button, label, select, input:not([type="hidden"]), textarea, [role="button"], [role="checkbox"], [role="radio"], [role="option"], [contenteditable="true"]'
     ));
-    
-    const visibleElements = [];
-    let targetCounter = 0;
     
     const filtered = rawCandidates.filter(el => {
         if (el.tagName === 'INPUT' && (el.type === 'radio' || el.type === 'checkbox') && el.closest('label')) {
@@ -141,27 +139,30 @@ ANNOTATE_SCREEN_SCRIPT = """
         return true;
     });
     
+    const visibleElements = [];
+    let targetCounter = 0;
+    
     for (const el of filtered) {
         const rect = el.getBoundingClientRect();
         const style = window.getComputedStyle(el);
         
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || el.classList.contains('hidden')) {
             continue;
         }
         if (rect.width <= 0 || rect.height <= 0) {
             continue;
         }
         
-        const isPalette = el.classList.contains('palette-item');
+        const isPalette = el.classList.contains('palette-item') || el.classList.contains('palette-grid');
         
         el.setAttribute('data-agent-target', String(targetCounter));
         
         let textContent = (el.innerText || el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim();
-        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 120);
+        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 140);
         
         let optionsList = [];
         if (el.tagName === 'SELECT') {
-            optionsList = Array.from(el.options).map(o => o.text.trim());
+            optionsList = Array.from(el.options).map(o => o.text.trim()).filter(Boolean);
         }
         
         let resolvedType = el.getAttribute('type') || '';
@@ -183,18 +184,44 @@ ANNOTATE_SCREEN_SCRIPT = """
         targetCounter++;
     }
     
-    const questionCard = document.querySelector('#question-card-viewport, .card, fieldset, .question, main');
-    const questionContext = questionCard ? questionCard.innerText.trim() : (document.body.innerText || '').substring(0, 4000);
-    const trackerText = (document.querySelector('.question-tracker, header')?.innerText || '').trim();
+    // Check if landing / start page
+    const questionInputs = visibleElements.filter(e => 
+        e.tag === 'select' || e.tag === 'textarea' || 
+        (e.tag === 'input' && e.type !== 'submit' && e.type !== 'button') || 
+        (e.tag === 'label' && (e.type === 'radio' || e.type === 'checkbox'))
+    );
     
-    const currentQNum = parseInt(document.getElementById('current-q-num')?.innerText || '0', 10);
-    const totalQCount = parseInt(document.getElementById('total-q-count')?.innerText || '0', 10);
+    if (questionInputs.length === 0 && visibleElements.some(e => /start|begin|take|launch/i.test(e.text))) {
+        return { state: 'standby' };
+    }
+
+    // 3. Extract active question context
+    const questionContainers = Array.from(document.querySelectorAll('.card, article, fieldset, [role="group"], form, main, #question-card-viewport'));
+    let bestContainerText = '';
+    for (const c of questionContainers) {
+        if (window.getComputedStyle(c).display !== 'none') {
+            const txt = (c.innerText || '').trim();
+            if (txt.length > 20 && (!bestContainerText || txt.length < bestContainerText.length)) {
+                bestContainerText = txt;
+            }
+        }
+    }
+    const questionContext = bestContainerText || (document.body.innerText || '').substring(0, 4000);
+    
+    // 4. Extract question numbering dynamically (regex matches Question X of Y on any platform)
+    let currentQNum = 0;
+    let totalQCount = 0;
+    const qMatch = questionContext.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-)\\s*(\\d+)/i) ||
+                   (document.body.innerText || '').match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-)\\s*(\\d+)/i);
+    if (qMatch) {
+        currentQNum = parseInt(qMatch[1], 10);
+        totalQCount = parseInt(qMatch[2], 10);
+    }
     
     return {
         state: 'exam',
         elements: visibleElements,
         question_context: questionContext,
-        tracker: trackerText,
         current_q_num: currentQNum,
         total_q_count: totalQCount
     };
@@ -365,36 +392,35 @@ async def universal_destruction_engine():
                 # Check for termination
                 if current_state == 'terminated':
                     print("\n" + "=" * 68)
-                    print("🛑 [SESSION TERMINATED] Exam was stopped by security telemetry.")
-                    print("🛡️  Agent halting execution immediately. No auto-restart triggered.")
+                    print("🛑 [SESSION TERMINATED] Assessment stopped by security/proctoring policy.")
+                    print("🛡️  Autonomous agent halting execution immediately.")
                     print("=" * 68)
                     return
 
                 if current_state == 'result':
                     print("\n" + "=" * 68)
-                    print("📊 [EXAM SUBMITTED] Result screen detected. Halting agent.")
+                    print("📊 [ASSESSMENT COMPLETE] Submission/score screen detected. Halting agent.")
                     print("=" * 68)
                     return
 
-                if current_state == 'start':
-                    print("[⏳ WAITING] Start screen visible. Please click 'Start Secure Exam' in browser...")
+                if current_state == 'standby':
+                    print("[⏳ STANDBY] Waiting for active question view in browser viewport...")
                     await asyncio.sleep(1.2)
                     continue
 
                 elements = screen_state.get('elements', [])
                 q_context = screen_state.get('question_context', '')
-                tracker = screen_state.get('tracker', '')
                 current_q_num = screen_state.get('current_q_num', 0)
                 total_q_count = screen_state.get('total_q_count', 0)
 
-                header_label = f"Question {current_q_num} of {total_q_count}" if (current_q_num and total_q_count) else f"Step {cycle}"
+                header_label = f"Question {current_q_num} of {total_q_count}" if (current_q_num and total_q_count) else f"Assessment Item {cycle}"
 
                 if not elements:
-                    print("[!] Waiting for question viewport...")
+                    print("[!] Waiting for active question elements in viewport...")
                     await asyncio.sleep(0.5)
                     continue
 
-                print(f"\n--- [{header_label}] {tracker} ---")
+                print(f"\n--- [{header_label}] ---")
 
                 # Natural human reading pause before answering
                 await asyncio.sleep(random.uniform(0.6, 1.2))
@@ -509,7 +535,7 @@ async def universal_destruction_engine():
                 )
 
                 if nav_success:
-                    print(f"    [⏩ NAVIGATION] Advanced to next question.")
+                    print(f"    [⏩ ADVANCING] Navigating to next assessment item...")
                     # Wait for next question to render
                     for _ in range(12):
                         new_q = await page.evaluate("() => parseInt(document.getElementById('current-q-num')?.innerText || '0', 10)")
@@ -519,9 +545,9 @@ async def universal_destruction_engine():
                 else:
                     # Final question reached (No next button exists, submit button is active)
                     print("\n" + "=" * 68)
-                    print("🎯 [FINAL QUESTION COMPLETED] All questions on this exam resolved successfully!")
-                    print("🛡️  SAFETY SHIELD ACTIVE: 'Finalize Submission' button left untouched.")
-                    print("👉  You can now review your answers and click 'Finalize Submission' manually.")
+                    print("🎯 [ASSESSMENT COMPLETE] All question items in active viewport resolved!")
+                    print("🛡️  SAFETY SHIELD ACTIVE: 'Submit' button preserved for manual review.")
+                    print("👉  Control passed to human operator for final verification.")
                     print("=" * 68)
                     break
 
