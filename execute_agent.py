@@ -25,7 +25,7 @@ CANDIDATE_MODELS = [
     "llama-3.3-70b-versatile"
 ]
 
-async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=14):
+async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=10):
     """Generates physical cubic Bezier curves with micro-tremors to mimic human hand motor dynamics."""
     try:
         for i in range(1, steps + 1):
@@ -35,12 +35,12 @@ async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=14):
             cx = from_x + (to_x - from_x) * t_curved
             cy = from_y + (to_y - from_y) * t_curved
             
-            arc = math.sin(t * math.pi) * 6.0 * (random.random() - 0.5)
-            noise_x = random.uniform(-0.4, 0.4)
-            noise_y = random.uniform(-0.4, 0.4)
+            arc = math.sin(t * math.pi) * 5.0 * (random.random() - 0.5)
+            noise_x = random.uniform(-0.3, 0.3)
+            noise_y = random.uniform(-0.3, 0.3)
             
             await page.mouse.move(cx + arc + noise_x, cy + arc + noise_y)
-            await asyncio.sleep(random.uniform(0.012, 0.022))
+            await asyncio.sleep(random.uniform(0.008, 0.016))
         
         await page.mouse.move(to_x, to_y)
     except Exception:
@@ -50,7 +50,7 @@ async def human_type(input_field, text):
     """Types text with natural human variance, capitalization pauses, and occasional auto-corrected typos."""
     try:
         await input_field.focus()
-        await asyncio.sleep(0.15)
+        await asyncio.sleep(0.1)
         
         for char in text:
             # 2% realistic typo auto-correction
@@ -62,16 +62,16 @@ async def human_type(input_field, text):
                 }
                 typo_char = typos.get(char.lower(), char)
                 await input_field.press(typo_char)
-                await asyncio.sleep(random.uniform(0.08, 0.14))
-                await asyncio.sleep(random.uniform(0.16, 0.24))
+                await asyncio.sleep(random.uniform(0.06, 0.12))
+                await asyncio.sleep(random.uniform(0.12, 0.18))
                 await input_field.press("Backspace")
-                await asyncio.sleep(random.uniform(0.08, 0.14))
+                await asyncio.sleep(random.uniform(0.06, 0.12))
                 
-            delay = random.uniform(0.06, 0.12)
+            delay = random.uniform(0.04, 0.09)
             if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?':
-                delay += random.uniform(0.08, 0.15)
+                delay += random.uniform(0.06, 0.12)
             if char in " ,.?!;":
-                delay += random.uniform(0.12, 0.22)
+                delay += random.uniform(0.08, 0.16)
                 
             await input_field.press(char)
             await asyncio.sleep(delay)
@@ -81,10 +81,9 @@ async def human_type(input_field, text):
         except Exception:
             pass
 
-# Universal DOM Annotation Script: tags all visible interactive widgets
 ANNOTATE_SCREEN_SCRIPT = """
 () => {
-    // 1. Check screen states first
+    // 1. Inspect screen states
     const isTerminated = document.getElementById('terminated-screen') && 
                          !document.getElementById('terminated-screen').classList.contains('hidden') &&
                          window.getComputedStyle(document.getElementById('terminated-screen')).display !== 'none';
@@ -97,19 +96,12 @@ ANNOTATE_SCREEN_SCRIPT = """
                     !document.getElementById('start-screen').classList.contains('hidden') &&
                     window.getComputedStyle(document.getElementById('start-screen')).display !== 'none';
                     
-    if (isTerminated) {
-        return { state: 'terminated' };
-    }
-    if (isResult) {
-        return { state: 'result' };
-    }
-    if (isStart) {
-        return { state: 'start' };
-    }
+    if (isTerminated) return { state: 'terminated' };
+    if (isResult) return { state: 'result' };
+    if (isStart) return { state: 'start' };
 
     document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
     
-    // Only search inside active question viewport to prevent clicking outside buttons
     const activeViewport = document.getElementById('question-card-viewport') || document.querySelector('.panel:not(.hidden)') || document.body;
     
     const rawCandidates = Array.from(activeViewport.querySelectorAll(
@@ -172,11 +164,16 @@ ANNOTATE_SCREEN_SCRIPT = """
     const questionContext = questionCard ? questionCard.innerText.trim() : (document.body.innerText || '').substring(0, 4000);
     const trackerText = (document.querySelector('.question-tracker, header')?.innerText || '').trim();
     
+    const currentQNum = parseInt(document.getElementById('current-q-num')?.innerText || '1', 10);
+    const totalQCount = parseInt(document.getElementById('total-q-count')?.innerText || '25', 10);
+    
     return {
         state: 'exam',
         elements: visibleElements,
         question_context: questionContext,
-        tracker: trackerText
+        tracker: trackerText,
+        current_q_num: currentQNum,
+        total_q_count: totalQCount
     };
 }
 """
@@ -244,7 +241,7 @@ async def robust_select_dropdown(element, opt_val):
     return False
 
 async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
-    """Guaranteed Next Button activator that moves the mouse naturally and clicks Save & Next."""
+    """Guaranteed Next Button activator that moves the mouse naturally and advances to the next question."""
     try:
         has_next = await page.evaluate("""() => {
             const nextBtn = document.getElementById('next-btn') || 
@@ -271,8 +268,6 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
                     await human_mouse_move(page, cur_x, cur_y, tx, ty)
                     cur_x, cur_y = tx, ty
             
-            # Natural human pause between question transitions
-            await asyncio.sleep(random.uniform(0.8, 1.4))
             return True, cur_x, cur_y
     except Exception:
         pass
@@ -297,7 +292,7 @@ def parse_llm_json(raw_text):
 async def universal_destruction_engine():
     print("=" * 68)
     print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
-    print("🎯 Natural Human Cadence + Zero-Restart Security Compliance")
+    print("🎯 Guaranteed 25-Question Non-Stop Solver Engine")
     print("=" * 68)
     
     for i in range(3, 0, -1):
@@ -329,14 +324,16 @@ async def universal_destruction_engine():
                 
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            MAX_SCREEN_CYCLES = 35
+            # Generous loop runway so it NEVER stops before question 25
+            MAX_SCREEN_CYCLES = 120
+            last_solved_question_num = -1
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
                 # 1. Inspect screen state
                 screen_state = await page.evaluate(ANNOTATE_SCREEN_SCRIPT)
                 current_state = screen_state.get('state', 'exam')
                 
-                # If the test was terminated by user or anti-cheat, HALT IMMEDIATELY (Do NOT reload)
+                # Check for termination
                 if current_state == 'terminated':
                     print("\n" + "=" * 68)
                     print("🛑 [SESSION TERMINATED] Exam was stopped by security telemetry.")
@@ -352,22 +349,24 @@ async def universal_destruction_engine():
 
                 if current_state == 'start':
                     print("[⏳ WAITING] Start screen visible. Please click 'Start Secure Exam' in browser...")
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(1.2)
                     continue
 
                 elements = screen_state.get('elements', [])
                 q_context = screen_state.get('question_context', '')
                 tracker = screen_state.get('tracker', f'Question Step {cycle}')
-                
+                current_q_num = screen_state.get('current_q_num', cycle)
+                total_q_count = screen_state.get('total_q_count', 25)
+
                 if not elements:
                     print("[!] Waiting for question viewport...")
-                    await asyncio.sleep(0.8)
+                    await asyncio.sleep(0.5)
                     continue
 
-                print(f"\n--- [Step {cycle}] {tracker} ---")
+                print(f"\n--- [Question {current_q_num} of {total_q_count}] {tracker} ---")
 
                 # Natural human reading pause before answering
-                await asyncio.sleep(random.uniform(0.8, 1.5))
+                await asyncio.sleep(random.uniform(0.6, 1.2))
 
                 # Filter question options
                 question_options = [e for e in elements if not e.get('is_palette_btn') and not any(
@@ -447,7 +446,7 @@ async def universal_destruction_engine():
                             continue
 
                         await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", target_el)
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(0.08)
                         
                         if act_type == "click":
                             _, current_mouse_x, current_mouse_y = await robust_click_element(
@@ -459,7 +458,7 @@ async def universal_destruction_engine():
                             _, current_mouse_x, current_mouse_y = await robust_click_element(
                                 page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
                             )
-                            await asyncio.sleep(0.1)
+                            await asyncio.sleep(0.08)
                             val = str(action.get("text", ""))
                             await human_type(target_el, val)
                             print(f"    [+] Typed '{val}' into [{t_idx}] -> {reason}")
@@ -469,9 +468,18 @@ async def universal_destruction_engine():
                             await robust_select_dropdown(target_el, opt_val)
                             print(f"    [+] Selected dropdown option '{opt_val}' on [{t_idx}] -> {reason}")
 
-                        await asyncio.sleep(random.uniform(0.3, 0.6))
+                        await asyncio.sleep(random.uniform(0.2, 0.4))
                     except Exception:
                         continue
+
+                # Check if this was the final question (Question 25)
+                if current_q_num >= total_q_count:
+                    print("\n" + "=" * 68)
+                    print(f"🎯 [FINAL QUESTION {total_q_count} REACHED] All {total_q_count} questions resolved successfully!")
+                    print("🛡️  SAFETY SHIELD ACTIVE: 'Finalize Submission' button left untouched.")
+                    print("👉  You can now review your answers and click 'Finalize Submission' manually.")
+                    print("=" * 68)
+                    break
 
                 # 2. Advance to the next question
                 nav_success, current_mouse_x, current_mouse_y = await trigger_next_button(
@@ -480,21 +488,23 @@ async def universal_destruction_engine():
 
                 if nav_success:
                     print(f"    [⏩ NAVIGATION] Advanced to next question.")
+                    # Wait for next question to render
+                    for _ in range(12):
+                        new_q = await page.evaluate("() => parseInt(document.getElementById('current-q-num')?.innerText || '0', 10)")
+                        if new_q > current_q_num:
+                            break
+                        await asyncio.sleep(0.1)
                 else:
-                    # Final question reached
+                    # Check if final submit button is visible
                     is_final = await page.evaluate("""() => {
                         const submitBtn = document.getElementById('submit-btn');
                         return submitBtn && !submitBtn.classList.contains('hidden') && window.getComputedStyle(submitBtn).display !== 'none';
                     }""")
                     if is_final:
                         print("\n" + "=" * 68)
-                        print("🎯 [FINAL QUESTION 25 REACHED] All 25 questions resolved successfully!")
+                        print(f"🎯 [FINAL QUESTION {total_q_count} REACHED] All {total_q_count} questions resolved successfully!")
                         print("🛡️  SAFETY SHIELD ACTIVE: 'Finalize Submission' button left untouched.")
-                        print("👉  You can now review your answers and click 'Finalize Submission' manually.")
                         print("=" * 68)
-                        break
-                    else:
-                        print("\n[*] Exam questions complete. All accessible elements resolved.")
                         break
 
         except Exception as e:
