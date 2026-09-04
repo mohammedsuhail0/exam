@@ -72,7 +72,7 @@ ANNOTATE_SCREEN_SCRIPT = """
     const visibleElements = [];
     let targetCounter = 0;
     
-    // Deduplicate: If an input is inside a label, only keep the label or input
+    // Deduplicate: If an input is inside a label, keep the label or input
     const filtered = rawCandidates.filter(el => {
         if (el.tagName === 'INPUT' && (el.type === 'radio' || el.type === 'checkbox') && el.closest('label')) {
             return false; // Let the parent label be the click target
@@ -104,10 +104,17 @@ ANNOTATE_SCREEN_SCRIPT = """
             optionsList = Array.from(el.options).map(o => o.text.trim());
         }
         
+        // Check input type from tag or child input
+        let resolvedType = el.getAttribute('type') || '';
+        if (!resolvedType && el.tagName === 'LABEL') {
+            const inner = el.querySelector('input');
+            if (inner) resolvedType = inner.type || '';
+        }
+        
         visibleElements.push({
             index: targetCounter,
             tag: el.tagName.toLowerCase(),
-            type: el.getAttribute('type') || '',
+            type: resolvedType,
             name: el.getAttribute('name') || '',
             text: textContent,
             options: optionsList,
@@ -118,7 +125,7 @@ ANNOTATE_SCREEN_SCRIPT = """
     }
     
     // Extract current question text clearly
-    const questionCard = document.querySelector('#question-card-viewport, .card, fieldset, .question');
+    const questionCard = document.querySelector('#question-card-viewport, .card, fieldset, .question, main');
     const questionContext = questionCard ? questionCard.innerText.trim() : (document.body.innerText || '').substring(0, 4000);
     const trackerText = (document.querySelector('.question-tracker, header')?.innerText || '').trim();
     
@@ -142,7 +149,7 @@ async def universal_destruction_engine():
 
     print("=" * 65)
     print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
-    print("🎯 Full-Viewport Visual Reasoning + Fluid Multi-Step Execution")
+    print("🎯 Layout-Agnostic / Guide-Independent Solver Engine")
     print("=" * 65)
     
     for i in range(3, 0, -1):
@@ -174,8 +181,7 @@ async def universal_destruction_engine():
                 
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            MAX_SCREEN_CYCLES = 35
-            last_question_snapshot = ""
+            MAX_SCREEN_CYCLES = 50
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
                 # Snapshot the screen and annotate all interactive widgets
@@ -189,33 +195,29 @@ async def universal_destruction_engine():
                     await asyncio.sleep(1.0)
                     continue
 
-                print(f"\n--- [Step {cycle}] {tracker} ---")
+                print(f"\n--- [Cycle {cycle}] {tracker} ---")
 
                 # Filter out palette buttons from LLM prompt to prevent distracting the solver
                 relevant_elements = [e for e in elements if not e.get('is_palette_btn')]
 
                 system_prompt = (
-                    "You are an expert academic solver analyzing an active screen of an online exam.\n"
+                    "You are a master academic solver taking an online exam.\n"
                     "All interactive elements have a `[data-agent-target=\"<index>\"]` integer index.\n\n"
-                    "Instructions:\n"
-                    "1. Read the active question and its options.\n"
-                    "2. Determine the correct answers with 100% precision.\n"
-                    "3. Return the exact actions needed to solve the question and advance.\n\n"
-                    "Action Types:\n"
-                    "- {\"type\": \"click\", \"target_index\": <idx>, \"reason\": \"...\"} (For MCQ radios, Checkboxes, or Next button)\n"
-                    "- {\"type\": \"type\", \"target_index\": <idx>, \"text\": \"...\", \"reason\": \"...\"} (For Fill-in-the-blank or Textarea)\n"
-                    "- {\"type\": \"select\", \"target_index\": <idx>, \"option_text\": \"...\", \"reason\": \"...\"} (For Dropdown <select>)\n\n"
-                    "CRITICAL SAFETY RULE:\n"
-                    "- If there is a 'Save & Next' or 'Next' button, include it as the LAST action in the array to advance to the next question.\n"
+                    "HOW TO DETERMINE QUESTION TYPES WITHOUT ANY GUIDE LABELS:\n"
+                    "1. If elements have `type: 'radio'`, this is a Single Choice MCQ -> Choose exactly 1 correct option index.\n"
+                    "2. If elements have `type: 'checkbox'`, this is a Multiple Selection MCQ -> Choose ALL valid option indices.\n"
+                    "3. If an element has `tag: 'select'`, this is a Dropdown -> Return `type: 'select'` and the exact `option_text`.\n"
+                    "4. If an element has `tag: 'input'` (type text) or `tag: 'textarea'`, this is a Text / Code response -> Return `type: 'type'` and the `text` to type.\n\n"
+                    "HOW TO ADVANCE:\n"
+                    "- If there is a 'Save & Next', 'Next', 'Continue', or 'Proceed' button on screen, include a click on it as the LAST action in your array.\n"
                     "- NEVER click final submission buttons ('Finalize Submission', 'Submit Exam', 'End Test').\n\n"
-                    "Output JSON schema:\n"
+                    "Output JSON format:\n"
                     "{\n"
-                    "  \"question_summary\": \"Question topic and format\",\n"
+                    "  \"question_summary\": \"Identified question and answer rationale\",\n"
                     "  \"actions\": [\n"
-                    "    {\"type\": \"click\", \"target_index\": 1, \"reason\": \"Select correct option\"},\n"
-                    "    {\"type\": \"click\", \"target_index\": 4, \"reason\": \"Click Save & Next\"}\n"
-                    "  ],\n"
-                    "  \"is_exam_complete\": false\n"
+                    "    {\"type\": \"click\", \"target_index\": 1, \"reason\": \"Select option\"},\n"
+                    "    {\"type\": \"click\", \"target_index\": 4, \"reason\": \"Click Next button\"}\n"
+                    "  ]\n"
                     "}"
                 )
                 
@@ -241,7 +243,7 @@ async def universal_destruction_engine():
                         continue
 
                 if not plan or not plan.get("actions"):
-                    print("[*] No more question actions required on this screen.")
+                    print("[*] No actions returned by solver.")
                     break
 
                 print(f"💡 AI Analysis: {plan.get('question_summary', 'Solving question...')}")
@@ -268,7 +270,7 @@ async def universal_destruction_engine():
 
                     # Scroll element into viewport
                     await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", target_el)
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.15)
                     
                     box = await target_el.bounding_box()
                     if not box:
@@ -285,9 +287,9 @@ async def universal_destruction_engine():
                         await page.mouse.click(target_x, target_y)
                         print(f"    [+] Clicked [{t_idx}] -> {reason}")
                         
-                        if any(x in el_text for x in ["next", "continue", "save & next", "proceed"]):
+                        if any(x in el_text for x in ["next", "continue", "save & next", "proceed", "forward", "→", ">"]):
                             has_navigated = True
-                            await asyncio.sleep(0.6)
+                            await asyncio.sleep(0.5)
                             break
                             
                     elif act_type == "type":
@@ -302,11 +304,31 @@ async def universal_destruction_engine():
                         await target_el.select_option(label=opt_val)
                         print(f"    [+] Selected dropdown option '{opt_val}' on [{t_idx}] -> {reason}")
 
-                    await asyncio.sleep(random.uniform(0.3, 0.6))
+                    await asyncio.sleep(random.uniform(0.2, 0.4))
+
+                # AUTO-ADVANCE FAILSAFE:
+                # If the AI answered the question but didn't include a click on "Next", find and click the Next button!
+                if not has_navigated:
+                    next_btn = await page.query_selector("button:not(.hidden):has-text('Next'), button:not(.hidden):has-text('Save & Next'), button:not(.hidden):has-text('Continue'), #next-btn:not(.hidden)")
+                    if next_btn:
+                        is_visible = await page.evaluate("(el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && window.getComputedStyle(el).display !== 'none'; }", next_btn)
+                        btn_txt = (await page.evaluate("(el) => (el.innerText || el.value || '').toLowerCase()", next_btn)).strip()
+                        
+                        if is_visible and not any(x in btn_txt for x in ["finalize", "submit", "finish", "end"]):
+                            box = await next_btn.bounding_box()
+                            if box:
+                                target_x = box['x'] + box['width'] / 2
+                                target_y = box['y'] + box['height'] / 2
+                                await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
+                                current_mouse_x, current_mouse_y = target_x, target_y
+                                await page.mouse.click(target_x, target_y)
+                                print(f"    [⏩ AUTO-ADVANCE] Clicked Next navigation button ('{btn_txt}') to load next question.")
+                                has_navigated = True
+                                await asyncio.sleep(0.5)
 
                 if not has_navigated:
-                    # Single page exam without Next buttons, or reached final question
-                    print("\n[*] Active page fully answered.")
+                    # No next button found on page (single page exam or reached the final submission screen)
+                    print("\n[*] Exam questions complete. All accessible elements resolved.")
                     break
 
             print("\n" + "=" * 65)
