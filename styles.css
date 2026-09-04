@@ -113,13 +113,174 @@ body {
   margin-top: 8px;
 }
 
-input[type="text"] {
+.btn.secondary {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.pill.info {
+  background: #172554;
+  color: #93c5fd;
+  border-color: #1d4ed8;
+}
+
+.header-status {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.question-tracker {
+  font-weight: 700;
+  font-size: 15px;
+  color: #60a5fa;
+  background: #1e293b;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+}
+
+.progress-container {
+  width: 100%;
+  height: 6px;
+  background: #1e293b;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  transition: width 0.3s ease;
+}
+
+.palette-section {
+  background: #0f141d;
+  border: 1px solid #222d3d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.palette-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.palette-item {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.palette-item.active {
+  border-color: #3b82f6;
+  background: #1e3a8a;
+  color: #ffffff;
+}
+
+.palette-item.answered {
+  background: #064e3b;
+  color: #6ee7b7;
+  border-color: #059669;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.badge-single {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.badge-multi {
+  background: #581c87;
+  color: #e9d5ff;
+}
+
+.badge-fib {
+  background: #14532d;
+  color: #86efac;
+}
+
+.badge-dropdown {
+  background: #78350f;
+  color: #fde68a;
+}
+
+.badge-textarea {
+  background: #701a75;
+  color: #f5d0fe;
+}
+
+.question-text {
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  color: #f1f5f9;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #161e2e;
+  border: 1px solid #283548;
+  padding: 12px 14px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.option-label:hover {
+  background: #1e293b;
+}
+
+.custom-select, textarea {
   width: 100%;
   background: #111827;
   border: 1px solid #334155;
   color: #e2e8f0;
   border-radius: 6px;
   padding: 10px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.nav-actions .btn {
+  flex: 1;
 }
 
 .danger {

@@ -16,7 +16,9 @@
     lastKeyTs: 0,
     frameSamples: [],
     eventBuffer: [],
-    questions: []
+    questions: [],
+    currentIndex: 0,
+    userAnswers: {}
   };
 
   const el = {
@@ -33,8 +35,13 @@
     resultSummary: document.getElementById("result-summary"),
     resultBreakdown: document.getElementById("result-breakdown"),
     sessionId: document.getElementById("session-id"),
-    mcqContainer: document.getElementById("mcq-container"),
-    fibContainer: document.getElementById("fib-container"),
+    questionViewport: document.getElementById("question-card-viewport"),
+    paletteContainer: document.getElementById("palette-container"),
+    currentQNum: document.getElementById("current-q-num"),
+    totalQCount: document.getElementById("total-q-count"),
+    progressFill: document.getElementById("progress-fill"),
+    prevBtn: document.getElementById("prev-btn"),
+    nextBtn: document.getElementById("next-btn"),
     submitBtn: document.getElementById("submit-btn"),
     statusPill: document.getElementById("status-pill")
   };
@@ -52,25 +59,153 @@
       .replace(/'/g, "&#039;");
   }
 
-  function renderQuestions(questions) {
-    const mcqs = questions.filter(q => q.type === "mcq");
-    const fibs = questions.filter(q => q.type === "fib");
+  function isAnswered(qId) {
+    const val = state.userAnswers[qId];
+    if (Array.isArray(val)) return val.length > 0;
+    return val !== undefined && val !== null && String(val).trim().length > 0;
+  }
 
-    el.mcqContainer.innerHTML = mcqs.map((q, idx) => `
-      <article class="card">
-        <h2>Question ${idx + 1} (MCQ)</h2>
-        <p>${escapeHtml(q.text)}</p>
-        ${q.options.map((opt) => `<label><input type="radio" name="${q.id}" value="${opt}"> ${escapeHtml(opt)}</label>`).join("")}
-      </article>
-    `).join("");
+  function renderPalette() {
+    if (!el.paletteContainer) return;
+    el.paletteContainer.innerHTML = state.questions.map((q, idx) => {
+      const activeClass = idx === state.currentIndex ? "active" : "";
+      const answeredClass = isAnswered(q.id) ? "answered" : "";
+      return `<button type="button" class="palette-item ${activeClass} ${answeredClass}" data-index="${idx}">${idx + 1}</button>`;
+    }).join("");
 
-    el.fibContainer.innerHTML = fibs.map((q, idx) => `
+    el.paletteContainer.querySelectorAll(".palette-item").forEach(btn => {
+      btn.addEventListener("click", () => {
+        saveCurrentInput();
+        state.currentIndex = parseInt(btn.dataset.index, 10);
+        renderCurrentQuestion();
+      });
+    });
+  }
+
+  function saveCurrentInput() {
+    if (!state.questions || state.questions.length === 0) return;
+    const q = state.questions[state.currentIndex];
+    if (!q) return;
+
+    if (q.type === "mcq") {
+      const checked = document.querySelector(`input[name="${q.id}"]:checked`);
+      state.userAnswers[q.id] = checked ? checked.value : "";
+    } else if (q.type === "multi_mcq") {
+      const checkedBoxes = Array.from(document.querySelectorAll(`input[name="${q.id}"]:checked`));
+      state.userAnswers[q.id] = checkedBoxes.map(cb => cb.value);
+    } else if (q.type === "dropdown") {
+      const selectEl = document.querySelector(`select[data-qid="${q.id}"]`);
+      state.userAnswers[q.id] = selectEl ? selectEl.value : "";
+    } else if (q.type === "fib") {
+      const inputEl = document.querySelector(`input[data-qid="${q.id}"]`);
+      state.userAnswers[q.id] = inputEl ? inputEl.value.trim() : "";
+    } else if (q.type === "textarea") {
+      const textEl = document.querySelector(`textarea[data-qid="${q.id}"]`);
+      state.userAnswers[q.id] = textEl ? textEl.value.trim() : "";
+    }
+  }
+
+  function renderCurrentQuestion() {
+    const total = state.questions.length;
+    if (total === 0) return;
+
+    const idx = state.currentIndex;
+    const q = state.questions[idx];
+
+    el.currentQNum.textContent = String(idx + 1);
+    el.totalQCount.textContent = String(total);
+    el.progressFill.style.width = `${Math.round(((idx + 1) / total) * 100)}%`;
+
+    // Navigation state
+    el.prevBtn.disabled = idx === 0;
+    if (idx === total - 1) {
+      el.nextBtn.classList.add("hidden");
+      el.submitBtn.classList.remove("hidden");
+    } else {
+      el.nextBtn.classList.remove("hidden");
+      el.submitBtn.classList.add("hidden");
+    }
+
+    let badgeHtml = "";
+    let inputHtml = "";
+    const savedVal = state.userAnswers[q.id];
+
+    if (q.type === "mcq") {
+      badgeHtml = `<span class="badge badge-single">Multiple Choice (Single)</span>`;
+      inputHtml = q.options.map(opt => {
+        const checked = savedVal === opt ? "checked" : "";
+        return `
+          <label class="option-label">
+            <input type="radio" name="${q.id}" value="${escapeHtml(opt)}" ${checked}>
+            <span>${escapeHtml(opt)}</span>
+          </label>
+        `;
+      }).join("");
+    } else if (q.type === "multi_mcq") {
+      badgeHtml = `<span class="badge badge-multi">Multiple Selection (Checkboxes)</span>`;
+      const savedArr = Array.isArray(savedVal) ? savedVal : [];
+      inputHtml = q.options.map(opt => {
+        const checked = savedArr.includes(opt) ? "checked" : "";
+        return `
+          <label class="option-label">
+            <input type="checkbox" name="${q.id}" value="${escapeHtml(opt)}" ${checked}>
+            <span>${escapeHtml(opt)}</span>
+          </label>
+        `;
+      }).join("");
+    } else if (q.type === "dropdown") {
+      badgeHtml = `<span class="badge badge-dropdown">Dropdown Selection</span>`;
+      inputHtml = `
+        <select class="custom-select" data-qid="${q.id}">
+          <option value="">-- Select Answer --</option>
+          ${q.options.map(opt => {
+            const selected = savedVal === opt ? "selected" : "";
+            return `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(opt)}</option>`;
+          }).join("")}
+        </select>
+      `;
+    } else if (q.type === "fib") {
+      badgeHtml = `<span class="badge badge-fib">Fill in the Blank</span>`;
+      inputHtml = `
+        <input class="fib-input" data-qid="${q.id}" type="text" autocomplete="off" placeholder="Type answer here" value="${escapeHtml(savedVal || "")}">
+      `;
+    } else if (q.type === "textarea") {
+      badgeHtml = `<span class="badge badge-textarea">Code / Text Response</span>`;
+      inputHtml = `
+        <textarea class="fib-input" data-qid="${q.id}" autocomplete="off" placeholder="Write answer here...">${escapeHtml(savedVal || "")}</textarea>
+      `;
+    }
+
+    el.questionViewport.innerHTML = `
       <article class="card">
-        <h2>Question ${mcqs.length + idx + 1} (Fill in the blank)</h2>
-        <p>${escapeHtml(q.text)}</p>
-        <input class="fib-input" data-qid="${q.id}" type="text" autocomplete="off" placeholder="Type answer here">
+        ${badgeHtml}
+        <h2>Question ${idx + 1}</h2>
+        <div class="question-text">${escapeHtml(q.text)}</div>
+        <div class="question-controls">
+          ${inputHtml}
+        </div>
       </article>
-    `).join("");
+    `;
+
+    renderPalette();
+    bindInputCadenceMonitors();
+  }
+
+  function bindInputCadenceMonitors() {
+    document.querySelectorAll(".fib-input").forEach((inputEl) => {
+      inputEl.addEventListener("input", (e) => {
+        const inputEvent = e;
+        if (inputEvent.inputType && inputEvent.inputType.includes("insertFromPaste")) {
+          enforceZeroStrike("paste_input_type", "PASTE_INPUT", "Paste-like input mutation detected.");
+        }
+        if ((inputEvent.data || "").length > 1) {
+          logEvent("bulk_input_observed", "high", { dataLength: inputEvent.data.length, qid: inputEl.dataset.qid });
+        }
+      });
+      inputEl.addEventListener("focus", () => {
+        state.lastKeyTs = 0;
+      });
+    });
   }
 
   function logEvent(type, confidence, details = {}) {
@@ -90,9 +225,7 @@
       const existing = JSON.parse(localStorage.getItem("secure_exam_audit") || "[]");
       existing.push(evt);
       localStorage.setItem("secure_exam_audit", JSON.stringify(existing.slice(-1000)));
-    } catch (_) {
-      // Best effort local fallback.
-    }
+    } catch (_) {}
 
     if (CONFIG.auditEndpoint && state.sessionToken) {
       fetch(CONFIG.auditEndpoint, {
@@ -145,6 +278,8 @@
       state.sessionId = startData.sessionId;
       state.sessionToken = startData.token;
       state.questions = startData.questions;
+      state.currentIndex = 0;
+      state.userAnswers = {};
     } catch (_) {
       terminateSession("SESSION_START_FAILED", "Unable to reach session service.");
       return;
@@ -162,8 +297,7 @@
     el.examScreen.classList.remove("hidden");
     el.sessionId.textContent = state.sessionId;
 
-    // Render questions dynamically before binding monitors
-    renderQuestions(state.questions);
+    renderCurrentQuestion();
 
     logEvent("session_started", "info", {
       userAgent: navigator.userAgent,
@@ -249,36 +383,20 @@
         state.lastKeyTs = t;
       }
     });
-
-    document.querySelectorAll(".fib-input").forEach((inputEl) => {
-      inputEl.addEventListener("input", (e) => {
-        const inputEvent = e;
-        if (inputEvent.inputType && inputEvent.inputType.includes("insertFromPaste")) {
-          enforceZeroStrike("paste_input_type", "PASTE_INPUT", "Paste-like input mutation detected.");
-        }
-        if ((inputEvent.data || "").length > 1) {
-          logEvent("bulk_input_observed", "high", { dataLength: inputEvent.data.length, qid: inputEl.dataset.qid });
-        }
-      });
-      inputEl.addEventListener("focus", () => {
-        state.lastKeyTs = 0;
-      });
-    });
   }
 
-  function collectAnswers() {
+  function collectAllAnswers() {
+    saveCurrentInput();
     const mcqAnswers = {};
-    const mcqs = state.questions.filter(q => q.type === "mcq");
-    for (const q of mcqs) {
-      const checked = document.querySelector(`input[name="${q.id}"]:checked`);
-      mcqAnswers[q.id] = checked ? checked.value : "";
-    }
-
     const fibAnswers = {};
-    const fibInputs = document.querySelectorAll(".fib-input");
-    for (const input of fibInputs) {
-      const v = input.value.trim();
-      fibAnswers[input.dataset.qid] = v;
+
+    for (const q of state.questions) {
+      const ans = state.userAnswers[q.id];
+      if (q.type === "mcq" || q.type === "multi_mcq" || q.type === "dropdown") {
+        mcqAnswers[q.id] = ans !== undefined ? ans : "";
+      } else {
+        fibAnswers[q.id] = ans !== undefined ? ans : "";
+      }
     }
 
     return { mcqAnswers, fibAnswers };
@@ -294,12 +412,6 @@
       mcqAnswers: allAnswers.mcqAnswers,
       fibAnswers: allAnswers.fibAnswers
     };
-  }
-
-  function countTextLengths(answersMap) {
-    let total = 0;
-    for (const v of Object.values(answersMap)) total += String(v).length;
-    return total;
   }
 
   function showResult(grading) {
@@ -321,7 +433,7 @@
 
   function submitExam() {
     if (state.terminated) return;
-    const answers = collectAnswers();
+    const answers = collectAllAnswers();
 
     const payload = buildSubmissionPayload(answers);
     fetch("/api/session/submit", {
@@ -344,8 +456,7 @@
         }
         logEvent("exam_submitted", "info", {
           mcqCount: Object.keys(answers.mcqAnswers).length,
-          fibCount: Object.keys(answers.fibAnswers).length,
-          fibTextLength: countTextLengths(answers.fibAnswers)
+          fibCount: Object.keys(answers.fibAnswers).length
         });
         if (!data.grading) {
           alert("Submission accepted.");
@@ -364,6 +475,23 @@
       el.startBtn.disabled = !el.consent.checked;
     });
     el.startBtn.addEventListener("click", enterSecureMode);
+
+    el.prevBtn.addEventListener("click", () => {
+      saveCurrentInput();
+      if (state.currentIndex > 0) {
+        state.currentIndex--;
+        renderCurrentQuestion();
+      }
+    });
+
+    el.nextBtn.addEventListener("click", () => {
+      saveCurrentInput();
+      if (state.currentIndex < state.questions.length - 1) {
+        state.currentIndex++;
+        renderCurrentQuestion();
+      }
+    });
+
     el.submitBtn.addEventListener("click", submitExam);
     el.restartBtn.addEventListener("click", () => window.location.reload());
     el.resultRestartBtn.addEventListener("click", () => window.location.reload());

@@ -63,27 +63,44 @@ module.exports = async (req, res) => {
     const q = allMap.get(id);
     if (!q) continue;
 
-    if (q.type === "mcq") {
+    if (q.type === "mcq" || q.type === "dropdown") {
       const given = String(mcqAnswers[id] || "");
       const expected = q.answer;
       const isCorrect = given === expected;
       results.push({
         id,
-        type: "mcq",
+        type: q.type,
         correct: isCorrect,
         expected,
         given
       });
       if (isCorrect) correct += 1;
       else wrong += 1;
-    } else if (q.type === "fib") {
+    } else if (q.type === "multi_mcq") {
+      const rawGiven = mcqAnswers[id];
+      const givenArray = Array.isArray(rawGiven) ? rawGiven : (rawGiven ? [String(rawGiven)] : []);
+      const expected = Array.isArray(q.answer) ? q.answer : [q.answer];
+      
+      const isCorrect = expected.length === givenArray.length && 
+        expected.every(ans => givenArray.includes(ans));
+        
+      results.push({
+        id,
+        type: "multi_mcq",
+        correct: isCorrect,
+        expected: expected.join(", "),
+        given: givenArray.join(", ")
+      });
+      if (isCorrect) correct += 1;
+      else wrong += 1;
+    } else if (q.type === "fib" || q.type === "textarea") {
       const given = String(fibAnswers[id] || "");
-      const accepted = q.answer;
+      const accepted = Array.isArray(q.answer) ? q.answer : [q.answer];
       const normalizedGiven = normalizeText(given);
       const isCorrect = accepted.some((ans) => normalizeText(ans) === normalizedGiven);
       results.push({
         id,
-        type: "fib",
+        type: q.type,
         correct: isCorrect,
         expected: accepted[0],
         given

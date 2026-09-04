@@ -223,279 +223,64 @@ const QUESTIONS_POOL = {
       answer: "Time to first render by optimizing CSSOM and DOM construction dependencies"
     },
     {
-      id: "hard_mcq_21",
-      type: "mcq",
-      text: "What is the primary vulnerability prevented by the HTTPOnly flag on cookies?",
+      id: "hard_multi_1",
+      type: "multi_mcq",
+      text: "Select ALL headers that directly enhance web application security (Select all that apply):",
       options: [
-        "Session Hijacking via Cross-Site Scripting (XSS)",
-        "Cross-Site Request Forgery (CSRF)",
-        "Man-in-the-Middle (MitM) packet sniffing"
+        "Content-Security-Policy",
+        "Strict-Transport-Security",
+        "Accept-Encoding",
+        "User-Agent"
       ],
-      answer: "Session Hijacking via Cross-Site Scripting (XSS)"
+      answer: ["Content-Security-Policy", "Strict-Transport-Security"]
     },
     {
-      id: "hard_mcq_22",
-      type: "mcq",
-      text: "Which CSS property forces a GPU layer (Hardware Acceleration) to be created?",
+      id: "hard_multi_2",
+      type: "multi_mcq",
+      text: "Which of the following JavaScript features introduce block-scoped variables? (Select all that apply):",
       options: [
-        "will-change: transform",
-        "display: block",
-        "position: absolute"
+        "let",
+        "const",
+        "var",
+        "function"
       ],
-      answer: "will-change: transform"
+      answer: ["let", "const"]
     },
     {
-      id: "hard_mcq_23",
-      type: "mcq",
-      text: "What is the output of console.log(typeof NaN) in JavaScript?",
+      id: "hard_multi_3",
+      type: "multi_mcq",
+      text: "Which of the following cause JavaScript microtasks to be queued? (Select all that apply):",
       options: [
-        "'number'",
-        "'NaN'",
-        "'undefined'"
+        "Promise.resolve().then()",
+        "queueMicrotask()",
+        "setTimeout()",
+        "setImmediate()"
       ],
-      answer: "'number'"
+      answer: ["Promise.resolve().then()", "queueMicrotask()"]
     },
     {
-      id: "hard_mcq_24",
-      type: "mcq",
-      text: "Which HTTP header implements client-side restriction of script execution sources?",
+      id: "hard_dropdown_1",
+      type: "dropdown",
+      text: "Select the HTTP Status Code for 'Too Many Requests' rate limiting:",
       options: [
-        "Content-Security-Policy (CSP)",
-        "Strict-Transport-Security (HSTS)",
-        "Cross-Origin-Embedder-Policy (COEP)"
+        "400 Bad Request",
+        "403 Forbidden",
+        "429 Too Many Requests",
+        "503 Service Unavailable"
       ],
-      answer: "Content-Security-Policy (CSP)"
+      answer: "429 Too Many Requests"
     },
     {
-      id: "hard_mcq_25",
-      type: "mcq",
-      text: "What is the main difference between microtasks and macrotasks in the JavaScript Event Loop?",
+      id: "hard_dropdown_2",
+      type: "dropdown",
+      text: "Select the CSS property that forces sub-pixel font antialiasing in WebKit engines:",
       options: [
-        "Microtasks run in a separate thread; macrotasks run in the main thread",
-        "The microtask queue is fully cleared before the loop checks for the next macrotask",
-        "Macrotasks have higher priority than microtasks"
+        "-webkit-font-smoothing",
+        "text-rendering",
+        "font-variant",
+        "font-optical-sizing"
       ],
-      answer: "The microtask queue is fully cleared before the loop checks for the next macrotask"
-    },
-    {
-      id: "hard_mcq_26",
-      type: "mcq",
-      text: "What does 'Event Delegation' in JavaScript rely on?",
-      options: [
-        "Event Bubbling",
-        "Event Capturing only",
-        "Immediate invocation of custom target listeners"
-      ],
-      answer: "Event Bubbling"
-    },
-    {
-      id: "hard_mcq_27",
-      type: "mcq",
-      text: "Which Javascript feature is used to build non-blocking iterators that yield values sequentially?",
-      options: [
-        "Generator Functions",
-        "Async/Await blocks only",
-        "Recursive Promises"
-      ],
-      answer: "Generator Functions"
-    },
-    {
-      id: "hard_mcq_28",
-      type: "mcq",
-      text: "What is the purpose of the Subresource Integrity (SRI) attribute in script elements?",
-      options: [
-        "To verify that fetched resources have not been altered in transit",
-        "To compress files on CDN hubs before fetching",
-        "To speed up cross-domain script execution"
-      ],
-      answer: "To verify that fetched resources have not been altered in transit"
-    },
-    {
-      id: "hard_mcq_29",
-      type: "mcq",
-      text: "Which CSS display property renders grid-like structures while keeping layout inline?",
-      options: [
-        "inline-grid",
-        "grid-inline",
-        "flex-grid"
-      ],
-      answer: "inline-grid"
-    },
-    {
-      id: "hard_mcq_30",
-      type: "mcq",
-      text: "What is the output of console.log([] == ![]) in JavaScript?",
-      options: [
-        "true",
-        "false",
-        "TypeError"
-      ],
-      answer: "true"
-    },
-    {
-      id: "hard_mcq_31",
-      type: "mcq",
-      text: "Which mechanism allows service workers to intercept network requests and serve cached content directly?",
-      options: [
-        "Fetch API event listener interception",
-        "HTTP/2 Push configuration",
-        "Domain Name Server (DNS) routing changes"
-      ],
-      answer: "Fetch API event listener interception"
-    },
-    {
-      id: "hard_mcq_32",
-      type: "mcq",
-      text: "What is the security risk of using target='_blank' without rel='noopener'?",
-      options: [
-        "The opened page can access the origin window's document.referrer and window.opener",
-        "It exposes session storage arrays directly",
-        "It triggers browser-level cross-site scripting filters"
-      ],
-      answer: "The opened page can access the origin window's document.referrer and window.opener"
-    },
-    {
-      id: "hard_mcq_33",
-      type: "mcq",
-      text: "What is the behavior of the JavaScript Object.defineProperty() method when adding a property with no descriptor details?",
-      options: [
-        "It defaults writable, enumerable, and configurable to false",
-        "It defaults writable, enumerable, and configurable to true",
-        "It throws a syntax compilation warning"
-      ],
-      answer: "It defaults writable, enumerable, and configurable to false"
-    },
-    {
-      id: "hard_mcq_34",
-      type: "mcq",
-      text: "Which CSS property controls how content fits into its box, similar to background-size?",
-      options: [
-        "object-fit",
-        "image-rendering",
-        "box-sizing"
-      ],
-      answer: "object-fit"
-    },
-    {
-      id: "hard_mcq_35",
-      type: "mcq",
-      text: "How does the 'WeakMap' differ from a standard 'Map' in JavaScript?",
-      options: [
-        "Its keys must be objects and are held as weak references for garbage collection",
-        "It is synchronized across web worker instances",
-        "It automatically sorts elements on insertion"
-      ],
-      answer: "Its keys must be objects and are held as weak references for garbage collection"
-    },
-    {
-      id: "hard_mcq_36",
-      type: "mcq",
-      text: "What does the CORS 'Preflight' request check?",
-      options: [
-        "If the target server trusts and accepts the actual cross-origin request method and headers",
-        "If the client has valid certificate credentials",
-        "If the file size is within limits"
-      ],
-      answer: "If the target server trusts and accepts the actual cross-origin request method and headers"
-    },
-    {
-      id: "hard_mcq_37",
-      type: "mcq",
-      text: "What happens when you resolve a Promise inside another Promise's constructor?",
-      options: [
-        "The outer promise will wait for the inner promise to settle",
-        "It throws an unhandled promise rejection error",
-        "It creates a synchronous call stack block"
-      ],
-      answer: "The outer promise will wait for the inner promise to settle"
-    },
-    {
-      id: "hard_mcq_38",
-      type: "mcq",
-      text: "Which layout standard does 'Grid Template Areas' follow?",
-      options: [
-        "CSS Grid Layout",
-        "Flexbox Layout",
-        "Table Layout"
-      ],
-      answer: "CSS Grid Layout"
-    },
-    {
-      id: "hard_mcq_39",
-      type: "mcq",
-      text: "What is the output of console.log(1 + '2' - 1) in JavaScript?",
-      options: [
-        "11",
-        "12",
-        "1"
-      ],
-      answer: "11"
-    },
-    {
-      id: "hard_mcq_40",
-      type: "mcq",
-      text: "What does 'Paint Flashing' dev tool option help visualize?",
-      options: [
-        "DOM elements that are currently being re-painted by the browser engine",
-        "Network latency metrics",
-        "Memory leak locations"
-      ],
-      answer: "DOM elements that are currently being re-painted by the browser engine"
-    },
-    {
-      id: "hard_mcq_41",
-      type: "mcq",
-      text: "Which Web API is used to measure highly accurate execution timing in scripts?",
-      options: [
-        "Performance API (performance.now())",
-        "Date API (Date.now())",
-        "Console API (console.time())"
-      ],
-      answer: "Performance API (performance.now())"
-    },
-    {
-      id: "hard_mcq_42",
-      type: "mcq",
-      text: "Which JavaScript scope context holds variables declared with 'var' outside any function?",
-      options: [
-        "Global Scope",
-        "Block Scope",
-        "Lexical Scope"
-      ],
-      answer: "Global Scope"
-    },
-    {
-      id: "hard_mcq_43",
-      type: "mcq",
-      text: "What does the CSS property 'box-sizing: border-box' include inside width and height calculations?",
-      options: [
-        "Padding and Border",
-        "Margin, Padding, and Border",
-        "Only the inner content area"
-      ],
-      answer: "Padding and Border"
-    },
-    {
-      id: "hard_mcq_44",
-      type: "mcq",
-      text: "Which CSS selector targeting matches an element that is the only child of its parent?",
-      options: [
-        ":only-child",
-        ":first-child",
-        ":last-child"
-      ],
-      answer: ":only-child"
-    },
-    {
-      id: "hard_mcq_45",
-      type: "mcq",
-      text: "Which HTTP status code is used for 'Precondition Required'?",
-      options: [
-        "428",
-        "412",
-        "403"
-      ],
-      answer: "428"
+      answer: "-webkit-font-smoothing"
     }
   ],
   fib: [
@@ -542,81 +327,33 @@ const QUESTIONS_POOL = {
       answer: ["wrap"]
     },
     {
-      id: "hard_fib_8",
-      type: "fib",
-      text: "Fill in: In HTTP caching, the validation token header sent by the server for resources is E____.",
-      answer: ["tag", "etag"]
-    },
-    {
-      id: "hard_fib_9",
-      type: "fib",
-      text: "Fill in: The JavaScript global function used to decode a URI component is decode______Component().",
-      answer: ["uri"]
-    },
-    {
-      id: "hard_fib_10",
-      type: "fib",
-      text: "Fill in: The CSS function used to calculate values dynamically, mixing units (e.g. 100% - 20px), is ______().",
-      answer: ["calc"]
-    },
-    {
-      id: "hard_fib_11",
-      type: "fib",
-      text: "Fill in: The browser storage that persists across sessions and has no expiration date is ______Storage.",
-      answer: ["local"]
-    },
-    {
-      id: "hard_fib_12",
-      type: "fib",
-      text: "Fill in: The CSS selector `:nth-child(______)` matches even elements.",
-      answer: ["even", "2n"]
-    },
-    {
-      id: "hard_fib_13",
-      type: "fib",
-      text: "Fill in: The JavaScript method used to convert an object into a JSON string is JSON.______().",
-      answer: ["stringify"]
-    },
-    {
-      id: "hard_fib_14",
-      type: "fib",
-      text: "Fill in: The HTTP header that enforces connection encryption and restricts browser access to HTTP version is Strict-Transport-______.",
-      answer: ["security"]
-    },
-    {
-      id: "hard_fib_15",
-      type: "fib",
-      text: "Fill in: The CSS property used to control the order of flex items is ______.",
-      answer: ["order"]
+      id: "hard_textarea_1",
+      type: "textarea",
+      text: "Code Explanation: What is the exact keyword used in JavaScript to export a single default value from an ES module?",
+      answer: ["default", "export default"]
     }
   ]
 };
 
-/**
- * Samples N random elements from an array.
- */
 function sample(arr, n) {
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, n);
 }
 
-/**
- * Selects 20 MCQs and 5 FIBs randomly and returns client-safe version.
- */
 function getQuestionsForSession() {
   const mcqs = sample(QUESTIONS_POOL.mcq, 20);
   const fibs = sample(QUESTIONS_POOL.fib, 5);
 
   const selected = [...mcqs, ...fibs];
 
-  // Client-safe questions mapping (excluding answers)
+  // Client-safe questions mapping
   const clientSafe = selected.map((q) => {
     const item = {
       id: q.id,
       text: q.text,
       type: q.type
     };
-    if (q.type === "mcq") {
+    if (q.options) {
       item.options = q.options;
     }
     return item;
@@ -628,13 +365,8 @@ function getQuestionsForSession() {
   };
 }
 
-/**
- * Retrieves the correct answers for a list of question IDs.
- */
 function getCorrectAnswers(questionIds) {
   const answerKey = {};
-  
-  // Create quick mapping
   const allMap = new Map();
   QUESTIONS_POOL.mcq.forEach(q => allMap.set(q.id, q));
   QUESTIONS_POOL.fib.forEach(q => allMap.set(q.id, q));
