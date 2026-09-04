@@ -3,8 +3,20 @@ import os
 import random
 import json
 import math
-import sys
 import re
+import sys
+
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from playwright.async_api import async_playwright
 from groq import Groq
 
@@ -244,22 +256,29 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
     """Guaranteed Next Button activator that moves the mouse naturally and advances to the next question."""
     try:
         has_next = await page.evaluate("""() => {
-            const nextBtn = document.getElementById('next-btn') || 
-                            Array.from(document.querySelectorAll('button:not(.hidden), a.btn, [role="button"]')).find(b => {
-                                const t = (b.innerText || b.value || '').toLowerCase().trim();
-                                return (t.includes('next') || t.includes('continue') || t.includes('proceed') || t.includes('save') || t.includes('forward')) && 
-                                       !t.includes('finalize') && !t.includes('submit') && !t.includes('finish') && !t.includes('reload') &&
-                                       b.offsetParent !== null && window.getComputedStyle(b).display !== 'none';
-                            });
-            if (nextBtn) {
+            const isVisible = (b) => b && !b.classList.contains('hidden') && b.offsetParent !== null && window.getComputedStyle(b).display !== 'none' && !b.disabled;
+            
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn && isVisible(nextBtn)) {
                 nextBtn.click();
+                return true;
+            }
+            
+            const altBtn = Array.from(document.querySelectorAll('button, a.btn, [role="button"]')).find(b => {
+                if (!isVisible(b)) return false;
+                const t = (b.innerText || b.value || '').toLowerCase().trim();
+                return (t.includes('next') || t.includes('continue') || t.includes('proceed') || t.includes('save') || t.includes('forward')) && 
+                       !t.includes('finalize') && !t.includes('submit') && !t.includes('finish') && !t.includes('reload');
+            });
+            if (altBtn) {
+                altBtn.click();
                 return true;
             }
             return false;
         }""")
 
         if has_next:
-            next_el = await page.query_selector("#next-btn, button:has-text('Next'), button:has-text('Save & Next'), button:has-text('Continue')")
+            next_el = await page.query_selector("#next-btn:not(.hidden), button:has-text('Next'):not(.hidden), button:has-text('Save & Next'):not(.hidden)")
             if next_el and await next_el.is_visible():
                 box = await next_el.bounding_box()
                 if box:

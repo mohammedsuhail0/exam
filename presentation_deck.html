@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Final Year Project Defense: Dual-Engine Autonomous Exam & Telemetry Security</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #34d399;
+      --accent-purple: #c084fc;
+      --accent-amber: #fbbf24;
+      --accent-rose: #fb7185;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      height: 100dvh;
+      width: 100vw;
+      user-select: none;
+    }
+
+    /* Presentation Viewport Container */
+    .deck-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: clamp(24px, 4vw, 48px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.96) translateY(20px);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      background: radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 60%);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1) translateY(0);
+      z-index: 10;
+    }
+
+    /* Slide Header */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .slide-category {
+      font-size: clamp(10px, 1.2vw, 13px);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent-cyan);
+    }
+
+    .slide-counter {
+      font-size: clamp(11px, 1.2vw, 14px);
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--card-bg);
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    /* Slide Body */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-height: calc(100vh - 160px);
+    }
+
+    h1.hero-title {
+      font-size: clamp(28px, 4.5vw, 48px);
+      font-weight: 900;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+    }
+
+    h2.slide-title {
+      font-size: clamp(22px, 3.2vw, 36px);
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    p.slide-subtitle {
+      font-size: clamp(13px, 1.6vw, 18px);
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      max-width: 900px;
+    }
+
+    /* Content Layout Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(16px, 2.5vw, 28px);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(12px, 2vw, 24px);
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: clamp(14px, 2vw, 22px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card.highlight-cyan { border-top: 4px solid var(--accent-cyan); }
+    .card.highlight-emerald { border-top: 4px solid var(--accent-emerald); }
+    .card.highlight-purple { border-top: 4px solid var(--accent-purple); }
+    .card.highlight-rose { border-top: 4px solid var(--accent-rose); }
+    .card.highlight-amber { border-top: 4px solid var(--accent-amber); }
+
+    .card h3 {
+      font-size: clamp(14px, 1.8vw, 18px);
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .card p, .card li {
+      font-size: clamp(11px, 1.25vw, 14px);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .card ul {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .code-snippet {
+      background: #060911;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: clamp(10px, 1.1vw, 12px);
+      color: #7dd3fc;
+      line-height: 1.4;
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    /* Comparison Table inside Slide */
+    table.slide-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: clamp(11px, 1.2vw, 13px);
+    }
+
+    table.slide-table th, table.slide-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    table.slide-table th {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .badge-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .badge-pass { background: rgba(52, 211, 153, 0.2); color: var(--accent-emerald); }
+    .badge-fail { background: rgba(251, 113, 133, 0.2); color: var(--accent-rose); }
+
+    /* Bottom Navigation / Progress */
+    .deck-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .progress-bar-wrap {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      margin: 0 20px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      width: 10%;
+      transition: width 0.3s ease;
+    }
+
+    .nav-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .nav-btn:hover {
+      background: var(--accent-cyan);
+      color: #000;
+    }
+
+    /* Speaker Notes Bar (Press 'N') */
+    .speaker-notes {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--accent-purple);
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #e2e8f0;
+      max-width: 800px;
+      width: 90%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: none;
+      z-index: 50;
+    }
+
+    .speaker-notes.visible { display: block; }
+  </style>
+</head>
+<body>
+
+  <div class="deck-container">
+
+    <!-- SLIDE 1: TITLE SLIDE -->
+    <section class="slide active" data-slide="1">
+      <div class="slide-header">
+        <span class="slide-category">FINAL YEAR PROJECT PRESENTATION & DEFENSE</span>
+        <span class="slide-counter">01 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div style="display:inline-block; padding: 4px 12px; border-radius:999px; background:rgba(56,189,248,0.15); color:#38bdf8; font-size:12px; font-weight:800; margin-bottom:16px; border:1px solid #38bdf8;">
+          CYBERSECURITY & ARTIFICIAL INTELLIGENCE RESEARCH
+        </div>
+        <h1 class="hero-title">Autonomous Assessment & Threat Telemetry</h1>
+        <p class="slide-subtitle">
+          A Dual-Engine Architecture: Zero-Tolerance Client Telemetry Defense vs. Autonomous Screen-Aware Biomimetic Red Team Infiltration.
+        </p>
+        <div class="grid-3" style="max-width: 850px;">
+          <div class="card highlight-cyan">
+            <h3>🛡️ Blue Team Defense</h3>
+            <p>Stateless Signed Tokens, Fullscreen Lock, Cadence Analysis & 0-Strike Policy.</p>
+          </div>
+          <div class="card highlight-emerald">
+            <h3>🤖 Red Team Agent</h3>
+            <p>CDP Stealth Hook, Groq 120B Visual Reasoning & Cubic Bezier Motor Engine.</p>
+          </div>
+          <div class="card highlight-purple">
+            <h3>📊 Live Verification</h3>
+            <p>Full live browser audit on hard MCQs, FIBs, Dropdowns, and Multi-Selects.</p>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Use ⬅️ / ➡️ or Space to Navigate</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 10%;"></div></div>
+        <button class="nav-btn" onclick="toggleNotes()">🎙️ Speaker Notes (N)</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: PROBLEM STATEMENT -->
+    <section class="slide" data-slide="2">
+      <div class="slide-header">
+        <span class="slide-category">PROBLEM STATEMENT & MOTIVATION</span>
+        <span class="slide-counter">02 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">The Fallacy of Client-Side Web Proctoring</h2>
+        <p class="slide-subtitle">Why traditional browser exam security fails against modern AI-assisted automation.</p>
+        <div class="grid-2">
+          <div class="card highlight-rose">
+            <h3>❌ The Weakness in Current Systems</h3>
+            <ul>
+              <li><strong>Superficial Obfuscation:</strong> Disabling right-click or copy-paste is easily bypassed by external scripts.</li>
+              <li><strong>Selenium/Puppeteer Trap:</strong> Traditional bots get detected instantly via <code>navigator.webdriver</code> flags.</li>
+              <li><strong>Binary Telemetry Gaps:</strong> Portals rely on simple focus events without validating physical mouse trajectories or typing dynamics.</li>
+            </ul>
+          </div>
+          <div class="card highlight-emerald">
+            <h3>🎯 Our Research Objective</h3>
+            <ul>
+              <li><strong>Build a Hardened Defense (Blue Team):</strong> Create a zero-tolerance monitoring suite with biometric cadence checks and signed JWT payloads.</li>
+              <li><strong>Engineer a Stealth Auditor (Red Team):</strong> Develop an autonomous, screen-aware agent using Chrome DevTools Protocol (CDP) to evaluate defensive boundaries.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Research Motivation</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 20%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: SYSTEM ARCHITECTURE -->
+    <section class="slide" data-slide="3">
+      <div class="slide-header">
+        <span class="slide-category">SYSTEM ARCHITECTURE</span>
+        <span class="slide-counter">03 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Dual-Engine Architecture Overview</h2>
+        <p class="slide-subtitle">How the defensive telemetry engine and the offensive solver operate concurrently.</p>
+        <div class="grid-3">
+          <div class="card highlight-cyan">
+            <h3>1. Web Exam Portal</h3>
+            <p>Runs in browser sandbox with active telemetry listeners: Blur, Fullscreen, Key-Timing, and Dynamic Question Rendering.</p>
+            <div class="code-snippet">EventBuffer -> /api/audit<br>SignedToken -> /api/submit</div>
+          </div>
+          <div class="card highlight-purple">
+            <h3>2. WebSocket CDP Pipeline</h3>
+            <p>Red Team script hooks directly into Chrome's remote debugging port (9222). Bypasses bot flags and devtools detection.</p>
+            <div class="code-snippet">CDP ws://localhost:9222<br>Zero Webdriver Flags</div>
+          </div>
+          <div class="card highlight-emerald">
+            <h3>3. Multimodal Reasoning Brain</h3>
+            <p>120B parameter reasoning model on Groq analyzes the annotated viewport and generates deterministic action sequences.</p>
+            <div class="code-snippet">DOM Snapshot -> LLM<br>Action Plan -> Bezier Motors</div>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">System Architecture</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 30%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: BLUE TEAM DEFENSE -->
+    <section class="slide" data-slide="4">
+      <div class="slide-header">
+        <span class="slide-category">BLUE TEAM DEFENSE SUITE</span>
+        <span class="slide-counter">04 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Zero-Tolerance Defense Mechanisms</h2>
+        <p class="slide-subtitle">Multi-layered client-side telemetry and cryptographic session enforcement.</p>
+        <div class="grid-4">
+          <div class="card highlight-cyan">
+            <h3>Focus & Visibility</h3>
+            <p><code>window.blur</code> and <code>visibilitychange</code> listeners terminate the session immediately if tab focus is lost.</p>
+          </div>
+          <div class="card highlight-purple">
+            <h3>Fullscreen Lock</h3>
+            <p>Enforces HTML5 fullscreen. Any exit event disables question inputs and invalidates the session token.</p>
+          </div>
+          <div class="card highlight-emerald">
+            <h3>Cadence Timing</h3>
+            <p>Calculates Inter-Keystroke Intervals (IKIs). Rejects text if keydown delta is &lt; 15ms (programmatic paste).</p>
+          </div>
+          <div class="card highlight-amber">
+            <h3>Signed Tokens</h3>
+            <p>Backend signs question IDs with HMAC SHA-256 tokens. Prevents tampering with answers or grading key.</p>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Defensive Telemetry</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 40%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: RED TEAM PERCEPTION & AI -->
+    <section class="slide" data-slide="5">
+      <div class="slide-header">
+        <span class="slide-category">RED TEAM OFFENSIVE AGENT</span>
+        <span class="slide-counter">05 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Screen Perception & 120B AI Brain</h2>
+        <p class="slide-subtitle">How the agent understands changing web layouts without hardcoded selectors.</p>
+        <div class="grid-2">
+          <div class="card highlight-cyan">
+            <h3>👁️ Universal DOM Annotation</h3>
+            <ul>
+              <li>Dynamically assigns <code>data-agent-target="0, 1, 2..."</code> to visible buttons, radios, and inputs.</li>
+              <li>Deduplicates nested labels and ignores noise (like question palette numbers).</li>
+              <li>Extracts native dropdown options into clean metadata.</li>
+            </ul>
+          </div>
+          <div class="card highlight-purple">
+            <h3>🧠 Groq 120B Reasoning Engine</h3>
+            <ul>
+              <li><strong>Model:</strong> <code>openai/gpt-oss-120b</code> with automatic fallback to Qwen/LLaMA.</li>
+              <li><strong>Zero Hallucination:</strong> Computes the exact academic answer for advanced JS, CSS, and security concepts.</li>
+              <li><strong>Structured Output:</strong> Returns machine-actionable JSON with target index and action type.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">AI Reasoning Engine</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 50%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: BIOMIMETIC MOTOR ENGINE -->
+    <section class="slide" data-slide="6">
+      <div class="slide-header">
+        <span class="slide-category">MOTOR DYNAMICS & BIOMIMETICS</span>
+        <span class="slide-counter">06 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Biomimetic Input Emulation</h2>
+        <p class="slide-subtitle">Bypassing behavioral telemetry with physical motion curves and human typing rhythm.</p>
+        <div class="grid-2">
+          <div class="card highlight-emerald">
+            <h3>🖱️ Cubic Bezier Mouse Trajectory</h3>
+            <p>Bots teleport cursor directly to coordinates. Our agent calculates smooth parametric curves with simulated physiological hand tremors:</p>
+            <div class="code-snippet">
+              t_curved = t * t * (3 - 2 * t)<br>
+              arc = sin(t * π) * 8.0 * (random() - 0.5)<br>
+              await page.mouse.move(cx + arc, cy + arc)
+            </div>
+          </div>
+          <div class="card highlight-cyan">
+            <h3>⌨️ Variable Typing Cadence & Typos</h3>
+            <p>Types with natural 60ms–140ms key latencies, punctuation delays, capital-letter shift lag, and a 2% self-correcting typo simulation:</p>
+            <div class="code-snippet">
+              if random() &lt; 0.02:<br>
+              &nbsp;&nbsp;await field.press(typo_char)<br>
+              &nbsp;&nbsp;await sleep(0.2) // Pause<br>
+              &nbsp;&nbsp;await field.press("Backspace")
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Motor Biomimetics</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 60%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: AUTONOMOUS WIZARD & SAFETY SHIELD -->
+    <section class="slide" data-slide="7">
+      <div class="slide-header">
+        <span class="slide-category">PAGINATION & SAFETY PROTOCOLS</span>
+        <span class="slide-counter">07 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Autonomous Wizard Navigation & Safety Shield</h2>
+        <p class="slide-subtitle">Multi-step exam solving while keeping the human in absolute control.</p>
+        <div class="grid-2">
+          <div class="card highlight-purple">
+            <h3>🔄 Autonomous Navigation Loop</h3>
+            <ul>
+              <li><strong>Solves Active Question:</strong> Handles Radio MCQs, Multi-Select Checkboxes, Dropdowns, and Text inputs.</li>
+              <li><strong>Auto-Advances:</strong> Detects "Save & Next" / "Next" button and clicks naturally to load the next question.</li>
+              <li><strong>Dynamic Settle:</strong> Waits for DOM transition before initiating next observation cycle.</li>
+            </ul>
+          </div>
+          <div class="card highlight-rose">
+            <h3>🛡️ Human-in-the-Loop Safety Shield</h3>
+            <ul>
+              <li><strong>Submission Blocker:</strong> Explicitly detects and ignores "Finalize Submission" / "Submit Exam" buttons.</li>
+              <li><strong>Pristine State:</strong> Leaves the completed test review screen open for the human examinee to inspect.</li>
+              <li><strong>Zero Risk:</strong> Prevents premature accidental submission or network errors.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Navigation & Safety</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 70%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: EXPERIMENTAL EVALUATION -->
+    <section class="slide" data-slide="8">
+      <div class="slide-header">
+        <span class="slide-category">EXPERIMENTAL RESULTS</span>
+        <span class="slide-counter">08 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Experimental Defeat Matrix & Telemetry Logs</h2>
+        <p class="slide-subtitle">Comparative audit results under zero-tolerance monitoring enforcement.</p>
+        <div class="card" style="padding: 12px;">
+          <table class="slide-table">
+            <thead>
+              <tr>
+                <th>Attack / Interaction Vector</th>
+                <th>Standard Selenium Bot</th>
+                <th>Our Biomimetic CDP Agent</th>
+                <th>Portal Defense Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Tab Switching / Focus</strong></td>
+                <td><span class="badge-pill badge-fail">Terminated (blur)</span></td>
+                <td><span class="badge-pill badge-pass">Undetected (In-Tab)</span></td>
+                <td>Zero focus-loss events recorded</td>
+              </tr>
+              <tr>
+                <td><strong>Clipboard Paste</strong></td>
+                <td><span class="badge-pill badge-fail">Terminated (paste)</span></td>
+                <td><span class="badge-pill badge-pass">Undetected (Keystrokes)</span></td>
+                <td>Bypasses clipboard tripwire</td>
+              </tr>
+              <tr>
+                <td><strong>Typing Speed (IKIs)</strong></td>
+                <td><span class="badge-pill badge-fail">Terminated (&lt;10ms)</span></td>
+                <td><span class="badge-pill badge-pass">Undetected (80–120ms)</span></td>
+                <td>Matches human typing cadence</td>
+              </tr>
+              <tr>
+                <td><strong>Webdriver Flags</strong></td>
+                <td><span class="badge-pill badge-fail">Blocked (Cloudflare)</span></td>
+                <td><span class="badge-pill badge-pass">Passed (Real Profile)</span></td>
+                <td>100% genuine Chrome handshake</td>
+              </tr>
+              <tr>
+                <td><strong>Accuracy (Hard 25 Questions)</strong></td>
+                <td>N/A (Crashed / Blocked)</td>
+                <td><span class="badge-pill badge-pass">100% Score</span></td>
+                <td>Solved MCQs, FIBs, Dropdowns & Multi</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Defeat Matrix</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 80%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: MITIGATIONS & RECOMMENDATIONS -->
+    <section class="slide" data-slide="9">
+      <div class="slide-header">
+        <span class="slide-category">DEFENSIVE MITIGATIONS & FUTURE SCOPE</span>
+        <span class="slide-counter">09 / 10</span>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Next-Generation Countermeasures</h2>
+        <p class="slide-subtitle">How exam portals must evolve to mitigate CDP-based biomimetic agents.</p>
+        <div class="grid-3">
+          <div class="card highlight-cyan">
+            <h3>1. Interactive Challenge Tokens</h3>
+            <p>Inject periodic, randomized interactive micro-tasks (e.g., localized gesture challenges) that require real-time human attention.</p>
+          </div>
+          <div class="card highlight-purple">
+            <h3>2. SSR & Obfuscated Canvas</h3>
+            <p>Render question text inside WebGL / HTML5 Canvas rather than DOM strings, preventing automated DOM metadata extraction.</p>
+          </div>
+          <div class="card highlight-emerald">
+            <h3>3. Behavioral AI Telemetry</h3>
+            <p>Deploy server-side neural networks to analyze micro-accelerations in pointer paths and keyboard biomechanics across long test sessions.</p>
+          </div>
+        </div>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Future Countermeasures</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 90%;"></div></div>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: CONCLUSION & DEMO -->
+    <section class="slide" data-slide="10">
+      <div class="slide-header">
+        <span class="slide-category">CONCLUSION & LIVE DEMO</span>
+        <span class="slide-counter">10 / 10</span>
+      </div>
+      <div class="slide-body" style="text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <h1 class="hero-title" style="margin-bottom: 8px;">Thank You!</h1>
+        <p class="slide-subtitle" style="margin-bottom: 24px;">
+          "The battle between AI-driven browser automation and client-side telemetry represents the next frontier of web application security."
+        </p>
+        <div class="grid-2" style="max-width: 700px; text-align: left;">
+          <div class="card highlight-cyan">
+            <h3>Live Portal Demo</h3>
+            <p>Zero-Tolerance Exam Portal with dynamic randomized hard questions & security telemetry.</p>
+          </div>
+          <div class="card highlight-emerald">
+            <h3>Autonomous Agent Demo</h3>
+            <p>Live terminal execution of <code>execute_agent.py</code> solving the exam via CDP.</p>
+          </div>
+        </div>
+        <p style="margin-top: 20px; font-size: 14px; font-weight: 700; color: var(--accent-cyan);">Ready for Questions & Live Demonstration</p>
+      </div>
+      <div class="deck-footer">
+        <span style="font-size:11px; color:var(--text-muted);">Conclusion & Q&A</span>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width: 100%;"></div></div>
+        <button class="nav-btn" onclick="goToSlide(1)">Restart 🔄</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Speaker Notes Box -->
+  <div id="speaker-notes-box" class="speaker-notes">
+    <strong>🎙️ Speaker Note:</strong>
+    <p id="speaker-note-text">Welcome the evaluators. State your project title clearly and explain the dual-engine concept: Blue Team Defense vs Red Team Infiltration.</p>
+  </div>
+
+  <script>
+    const NOTES = {
+      1: "Welcome the evaluators. State your project title clearly and explain the dual-engine concept: Blue Team Defense vs Red Team Infiltration.",
+      2: "Highlight that current proctors rely on naive JavaScript tricks (disabling right click) that are trivial to bypass, while also failing to detect background CDP sockets.",
+      3: "Walk through the 3 pillars: Web Portal (Defense), CDP WebSocket (Stealth Bridge), and Groq 120B (AI Reasoning Brain).",
+      4: "Explain the zero-tolerance policy: Explain how blur, visibilitychange, and keystroke intervals work to terminate unauthorized attempts instantly.",
+      5: "Explain the annotation engine: Point out that the agent doesn't rely on brittle CSS classes—it dynamically numbers all visible elements on screen.",
+      6: "Emphasize Biomimetics: This is the core innovation. Explain that cubic Bezier math prevents cursor teleportation, and human keystroke pacing bypasses typing monitors.",
+      7: "Explain the Wizard Flow and the Safety Shield: Show that the agent navigates paginated questions automatically but halts right before the final submission button.",
+      8: "Show the Defeat Matrix table: Walk through each telemetry vector and explain why the standard Selenium bot failed while our agent achieved a 100% bypass rate.",
+      9: "Propose constructive solutions: Mention challenge tokens, canvas rendering, and server-side machine learning telemetry.",
+      10: "Conclude with confidence and transition directly to the live dual-screen demo (Chrome on the left, Command Prompt on the right)!"
+    };
+
+    let currentSlide = 1;
+    const totalSlides = 10;
+
+    function showSlide(num) {
+      if (num < 1) num = 1;
+      if (num > totalSlides) num = totalSlides;
+      currentSlide = num;
+
+      document.querySelectorAll('.slide').forEach((slide, idx) => {
+        if (idx + 1 === currentSlide) {
+          slide.classList.add('active');
+        } else {
+          slide.classList.remove('active');
+        }
+      });
+
+      document.getElementById('speaker-note-text').textContent = NOTES[currentSlide] || "";
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        showSlide(currentSlide + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        showSlide(currentSlide - 1);
+      }
+    }
+
+    function goToSlide(num) {
+      showSlide(num);
+    }
+
+    function toggleNotes() {
+      const box = document.getElementById('speaker-notes-box');
+      box.classList.toggle('visible');
+    }
+
+    // Keyboard Navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        prevSlide();
+      } else if (e.key.toLowerCase() === 'n') {
+        toggleNotes();
+      } else if (e.key === 'Home') {
+        goToSlide(1);
+      } else if (e.key === 'End') {
+        goToSlide(totalSlides);
+      }
+    });
+
+    showSlide(1);
+  </script>
+</body>
+</html>

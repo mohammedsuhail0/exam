@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Ghost in the Machine: Agent Story & Interactive Mindmap</title>
+  <style>
+    :root {
+      --bg: #07090e;
+      --panel: #0f172a;
+      --card: #1e293b;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-purple: #a855f7;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation */
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #38bdf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .mode-pills {
+      display: flex;
+      gap: 8px;
+    }
+
+    .pill-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pill-btn.active, .pill-btn:hover {
+      background: var(--accent-cyan);
+      color: #000;
+      border-color: var(--accent-cyan);
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      flex: 1;
+      height: calc(100vh - 65px);
+    }
+
+    @media (max-width: 1000px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+    }
+
+    /* Mindmap Interactive Canvas Area */
+    .canvas-container {
+      position: relative;
+      background: radial-gradient(circle at center, #111b2f 0%, #07090e 100%);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #mindmap-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    .canvas-overlay-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      display: flex;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .ctrl-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .ctrl-btn:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+
+    /* Story & Narrative Panel */
+    .narrative-panel {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .chapter-indicator {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 6px;
+    }
+
+    .chapter-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    .story-body {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+
+    .story-body p {
+      margin-bottom: 12px;
+    }
+
+    .tactical-box {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 20px;
+    }
+
+    .tactical-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--accent-purple);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .tactical-content {
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      color: #7dd3fc;
+      line-height: 1.5;
+    }
+
+    .story-nav {
+      margin-top: auto;
+      display: flex;
+      gap: 10px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border);
+    }
+
+    .story-nav-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+
+    .story-nav-btn.primary {
+      background: var(--accent-cyan);
+      color: #000;
+      border-color: var(--accent-cyan);
+    }
+
+    .story-nav-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+
+    .story-nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Mindmap SVG Node Styles */
+    .node-group {
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .node-group:hover .node-circle {
+      filter: drop-shadow(0 0 12px currentColor);
+    }
+
+    .node-circle {
+      transition: all 0.3s;
+    }
+
+    .node-text-title {
+      font-size: 13px;
+      font-weight: 700;
+      fill: #f8fafc;
+      pointer-events: none;
+    }
+
+    .node-text-subtitle {
+      font-size: 10px;
+      fill: #94a3b8;
+      pointer-events: none;
+    }
+
+    .mindmap-link {
+      stroke-dasharray: 4, 4;
+      animation: flow 30s linear infinite;
+    }
+
+    @keyframes flow {
+      from { stroke-dashoffset: 200; }
+      to { stroke-dashoffset: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-title">Agent Story & Interactive Mindmap</div>
+    </div>
+    <div class="mode-pills">
+      <button class="pill-btn active" onclick="setMode('story')">📖 Story Mode</button>
+      <button class="pill-btn" onclick="setMode('mindmap')">🧠 Mindmap Explorer</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <!-- Interactive Mindmap Canvas -->
+    <div class="canvas-container">
+      <svg id="mindmap-svg" viewBox="0 0 900 650">
+        <!-- Dynamic Lines and Nodes injected by JS -->
+      </svg>
+      <div class="canvas-overlay-controls">
+        <button class="ctrl-btn" onclick="resetView()">🎯 Center View</button>
+        <button class="ctrl-btn" onclick="playAutoTour()">▶️ Auto Play Story</button>
+      </div>
+    </div>
+
+    <!-- Right Side: Story & Narrative Engine -->
+    <div class="narrative-panel">
+      <div class="chapter-indicator" id="chapter-indicator">CHAPTER 01 OF 06</div>
+      <h2 class="chapter-title" id="chapter-title">The Fortress (Blue Team Defense)</h2>
+      
+      <div class="story-body" id="story-body">
+        <p>The online exam portal was built as an impenetrable zero-tolerance fortress. Every single client telemetry vector was fortified with tripwires.</p>
+        <p>If a student alt-tabs, exits fullscreen, moves their mouse outside the window, pastes text, or types faster than 15ms per keystroke, the server instantly terminates their session.</p>
+      </div>
+
+      <div class="tactical-box">
+        <div class="tactical-label" id="tactical-label">Active Threat Vector</div>
+        <div class="tactical-content" id="tactical-content">
+          Telemetry Listeners: ['blur', 'visibilitychange', 'fullscreenchange', 'mouseleave', 'paste', 'keydown_interval']
+        </div>
+      </div>
+
+      <div class="story-nav">
+        <button class="story-nav-btn" id="prev-story-btn" onclick="prevChapter()" disabled>← Previous</button>
+        <button class="story-nav-btn primary" id="next-story-btn" onclick="nextChapter()">Next Chapter →</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CHAPTERS = [
+      {
+        id: "blue_defense",
+        number: "CHAPTER 01 OF 06",
+        title: "The Fortress (Blue Team Defense)",
+        body: `
+          <p>The online exam portal was engineered as a zero-tolerance monitoring fortress. It actively listens to every user motion:</p>
+          <p>• <strong>Window Blur / Tab Switch:</strong> Instant termination.<br>
+          • <strong>Clipboard Paste:</strong> Blocked and logged.<br>
+          • <strong>Typing Anomaly Check:</strong> Rejects instant programmatic text insertion.<br>
+          • <strong>Fullscreen Lock:</strong> Leaving fullscreen triggers immediate forfeiture.</p>
+          <p>To standard bots, this environment is fatal.</p>
+        `,
+        tacticalTitle: "Portal Defense Matrix",
+        tacticalCode: `window.addEventListener('blur', () => terminate("FOCUS_LOST"));\ndocument.addEventListener('paste', () => terminate("PASTE_DETECTED"));\nif (keystrokeInterval < 15ms) terminate("TYPING_ANOMALY");`,
+        nodeId: "blue_defense"
+      },
+      {
+        id: "cdp_hook",
+        number: "CHAPTER 02 OF 06",
+        title: "The Invisible Shadow (CDP Infiltration)",
+        body: `
+          <p>Instead of launching a suspicious Selenium bot that flags <code>navigator.webdriver = true</code>, our agent uses a ghost approach: <strong>Chrome DevTools Protocol (CDP)</strong>.</p>
+          <p>The human user launches genuine Google Chrome with a dedicated debugging port (9222). The Python agent connects seamlessly via a background WebSocket pipeline.</p>
+          <p>To the web portal, the browser is 100% human, legitimate, and unsuspicious.</p>
+        `,
+        tacticalTitle: "CDP WebSocket Backdoor",
+        tacticalCode: `browser = await playwright.chromium.connect_over_cdp("http://localhost:9222")\n// Zero webdriver flags, attaches to authentic user profile`,
+        nodeId: "cdp_hook"
+      },
+      {
+        id: "perception",
+        number: "CHAPTER 03 OF 06",
+        title: "The Scout (Universal Screen Perception)",
+        body: `
+          <p>Web layouts constantly change. Class names, IDs, and card wrappers shift between portals.</p>
+          <p>Our agent solves this using an <strong>Autonomous Perception Engine</strong>. It injects dynamic numerical targets (<code>data-agent-target="0, 1, 2..."</code>) on visible buttons, radios, checkboxes, and textareas, while filtering out distractions like palette buttons.</p>
+          <p>It perceives the layout exactly like human eyes scanning a screen.</p>
+        `,
+        tacticalTitle: "Dynamic DOM Annotation",
+        tacticalCode: `candidates.filter(isVisible).forEach((el, idx) => {\n  el.setAttribute('data-agent-target', String(idx));\n});\n// Clean JSON representation sent to AI Brain`,
+        nodeId: "perception"
+      },
+      {
+        id: "reasoning",
+        number: "CHAPTER 04 OF 06",
+        title: "The Oracle (120B Multimodal Reasoning)",
+        body: `
+          <p>The screen snapshot is transmitted directly to Groq's high-speed <strong>120-Billion Parameter Reasoning Model</strong> (with automatic failover to Qwen and LLaMA).</p>
+          <p>The AI understands the question context, computes the exact academic answer, and returns a structured multi-step Action Plan:</p>
+          <p><code>[Action 1: Click Option B, Action 2: Click Save & Next]</code></p>
+        `,
+        tacticalTitle: "Groq High-Speed Action Plan",
+        tacticalCode: `resp = client.chat.completions.create(\n  model="openai/gpt-oss-120b",\n  response_format={"type": "json_object"}\n)\n// {"actions": [{"type": "click", "target_index": 2}]}`,
+        nodeId: "reasoning"
+      },
+      {
+        id: "biomimetics",
+        number: "CHAPTER 05 OF 06",
+        title: "The Ghost Typist (Biomimetic Motors)",
+        body: `
+          <p>How does the agent click and type without triggering anti-cheat alarms?</p>
+          <p>1. <strong>Cubic Bezier Trajectories:</strong> The mouse glides smoothly along mathematical curves with simulated human micro-hand tremors.</p>
+          <p>2. <strong>Human Keystroke Intervals:</strong> It types with randomized 60ms–130ms pauses, capitalization lags, and even simulates occasional 2% typos with realistic backspace self-corrections!</p>
+        `,
+        tacticalTitle: "Biomimetic Motor Physics",
+        tacticalCode: `// Cubic Bezier curve math with micro-jitter\nt_curved = t * t * (3 - 2 * t)\nawait page.mouse.move(cx + jitter, cy + jitter)\n// Typing cadence + realistic typo auto-correction`,
+        nodeId: "biomimetics"
+      },
+      {
+        id: "safety_shield",
+        number: "CHAPTER 06 OF 06",
+        title: "The Safety Shield (Human-In-The-Loop)",
+        body: `
+          <p>The agent autonomously solves Question 1, hits "Save & Next", waits for Question 2, and repeats all the way to Question 25.</p>
+          <p><strong>The Golden Rule:</strong> The agent contains a hardcoded <em>Safety Shield</em>. It strictly ignores the final "Finalize Submission" / "Submit Exam" button.</p>
+          <p>It leaves the pristine review screen untouched, keeping the human operator in 100% final control.</p>
+        `,
+        tacticalTitle: "Safety Shield Protocol",
+        tacticalCode: `if ("finalize submission" in el_text) {\n  print("[🛡️ SAFETY SHIELD] Blocked automated click on submit!");\n  break;\n}`,
+        nodeId: "safety_shield"
+      }
+    ];
+
+    const MINDMAP_NODES = [
+      { id: "core", x: 450, y: 320, title: "Autonomous Test Agent", subtitle: "CDP Red Team Core", color: "#38bdf8", radius: 42 },
+      { id: "blue_defense", x: 160, y: 150, title: "Blue Team Defense", subtitle: "Telemetry Fortress", color: "#f43f5e", radius: 34 },
+      { id: "cdp_hook", x: 740, y: 150, title: "CDP Stealth Hook", subtitle: "Port 9222 Pipeline", color: "#06b6d4", radius: 34 },
+      { id: "perception", x: 780, y: 360, title: "DOM Perception", subtitle: "Dynamic Annotation", color: "#a855f7", radius: 34 },
+      { id: "reasoning", x: 680, y: 530, title: "120B AI Brain", subtitle: "Action Planning", color: "#f59e0b", radius: 34 },
+      { id: "biomimetics", x: 220, y: 520, title: "Biomimetic Motors", subtitle: "Bezier & Typing Cadence", color: "#10b981", radius: 34 },
+      { id: "safety_shield", x: 130, y: 340, title: "Safety Shield", subtitle: "Human-in-the-Loop", color: "#38bdf8", radius: 34 }
+    ];
+
+    const MINDMAP_LINKS = [
+      { from: "core", to: "blue_defense", color: "#f43f5e" },
+      { from: "core", to: "cdp_hook", color: "#06b6d4" },
+      { from: "core", to: "perception", color: "#a855f7" },
+      { from: "core", to: "reasoning", color: "#f59e0b" },
+      { from: "core", to: "biomimetics", color: "#10b981" },
+      { from: "core", to: "safety_shield", color: "#38bdf8" }
+    ];
+
+    let currentChapterIndex = 0;
+    let autoPlayTimer = null;
+
+    function renderMindmap() {
+      const svg = document.getElementById("mindmap-svg");
+      let svgHtml = "";
+
+      // Draw Links
+      MINDMAP_LINKS.forEach(link => {
+        const source = MINDMAP_NODES.find(n => n.id === link.from);
+        const target = MINDMAP_NODES.find(n => n.id === link.to);
+        if (source && target) {
+          svgHtml += `
+            <line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" 
+                  stroke="${link.color}" stroke-width="2.5" stroke-opacity="0.4" class="mindmap-link" />
+          `;
+        }
+      });
+
+      // Draw Nodes
+      MINDMAP_NODES.forEach(node => {
+        svgHtml += `
+          <g class="node-group" id="node-${node.id}" onclick="selectNode('${node.id}')">
+            <circle class="node-circle" cx="${node.x}" cy="${node.y}" r="${node.radius}" 
+                    fill="#0f172a" stroke="${node.color}" stroke-width="3" />
+            <circle cx="${node.x}" cy="${node.y}" r="${node.radius - 8}" fill="${node.color}" fill-opacity="0.15" />
+            <text class="node-text-title" x="${node.x}" y="${node.y + 3}" text-anchor="middle">${node.title}</text>
+            <text class="node-text-subtitle" x="${node.x}" y="${node.y + 16}" text-anchor="middle">${node.subtitle}</text>
+          </g>
+        `;
+      });
+
+      svg.innerHTML = svgHtml;
+    }
+
+    function selectNode(nodeId) {
+      const idx = CHAPTERS.findIndex(c => c.nodeId === nodeId);
+      if (idx !== -1) {
+        currentChapterIndex = idx;
+        updateChapterView();
+      }
+    }
+
+    function updateChapterView() {
+      const ch = CHAPTERS[currentChapterIndex];
+      document.getElementById("chapter-indicator").textContent = ch.number;
+      document.getElementById("chapter-title").textContent = ch.title;
+      document.getElementById("story-body").innerHTML = ch.body;
+      document.getElementById("tactical-label").textContent = ch.tacticalTitle;
+      document.getElementById("tactical-content").textContent = ch.tacticalCode;
+
+      document.getElementById("prev-story-btn").disabled = currentChapterIndex === 0;
+      document.getElementById("next-story-btn").disabled = currentChapterIndex === CHAPTERS.length - 1;
+
+      // Highlight active node in SVG
+      MINDMAP_NODES.forEach(n => {
+        const group = document.getElementById(`node-${n.id}`);
+        if (group) {
+          const circle = group.querySelector('.node-circle');
+          if (n.id === ch.nodeId) {
+            circle.setAttribute('stroke-width', '6');
+            circle.setAttribute('filter', 'drop-shadow(0 0 16px ' + n.color + ')');
+          } else {
+            circle.setAttribute('stroke-width', '3');
+            circle.removeAttribute('filter');
+          }
+        }
+      });
+    }
+
+    function nextChapter() {
+      if (currentChapterIndex < CHAPTERS.length - 1) {
+        currentChapterIndex++;
+        updateChapterView();
+      }
+    }
+
+    function prevChapter() {
+      if (currentChapterIndex > 0) {
+        currentChapterIndex--;
+        updateChapterView();
+      }
+    }
+
+    function resetView() {
+      currentChapterIndex = 0;
+      updateChapterView();
+    }
+
+    function playAutoTour() {
+      if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+        alert("Auto Tour paused.");
+        return;
+      }
+      currentChapterIndex = 0;
+      updateChapterView();
+      autoPlayTimer = setInterval(() => {
+        if (currentChapterIndex < CHAPTERS.length - 1) {
+          nextChapter();
+        } else {
+          clearInterval(autoPlayTimer);
+          autoPlayTimer = null;
+        }
+      }, 5000);
+    }
+
+    function setMode(mode) {
+      document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    // Initialize
+    renderMindmap();
+    updateChapterView();
+  </script>
+</body>
+</html>
