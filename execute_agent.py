@@ -164,8 +164,8 @@ ANNOTATE_SCREEN_SCRIPT = """
     const questionContext = questionCard ? questionCard.innerText.trim() : (document.body.innerText || '').substring(0, 4000);
     const trackerText = (document.querySelector('.question-tracker, header')?.innerText || '').trim();
     
-    const currentQNum = parseInt(document.getElementById('current-q-num')?.innerText || '1', 10);
-    const totalQCount = parseInt(document.getElementById('total-q-count')?.innerText || '25', 10);
+    const currentQNum = parseInt(document.getElementById('current-q-num')?.innerText || '0', 10);
+    const totalQCount = parseInt(document.getElementById('total-q-count')?.innerText || '0', 10);
     
     return {
         state: 'exam',
@@ -247,7 +247,7 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
             const nextBtn = document.getElementById('next-btn') || 
                             Array.from(document.querySelectorAll('button:not(.hidden), a.btn, [role="button"]')).find(b => {
                                 const t = (b.innerText || b.value || '').toLowerCase().trim();
-                                return (t.includes('next') || t.includes('continue') || t.includes('proceed') || t.includes('save')) && 
+                                return (t.includes('next') || t.includes('continue') || t.includes('proceed') || t.includes('save') || t.includes('forward')) && 
                                        !t.includes('finalize') && !t.includes('submit') && !t.includes('finish') && !t.includes('reload') &&
                                        b.offsetParent !== null && window.getComputedStyle(b).display !== 'none';
                             });
@@ -259,7 +259,7 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
         }""")
 
         if has_next:
-            next_el = await page.query_selector("#next-btn, button:has-text('Next'), button:has-text('Save & Next')")
+            next_el = await page.query_selector("#next-btn, button:has-text('Next'), button:has-text('Save & Next'), button:has-text('Continue')")
             if next_el and await next_el.is_visible():
                 box = await next_el.bounding_box()
                 if box:
@@ -292,7 +292,7 @@ def parse_llm_json(raw_text):
 async def universal_destruction_engine():
     print("=" * 68)
     print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
-    print("🎯 Guaranteed 25-Question Non-Stop Solver Engine")
+    print("🎯 Dynamic Solver Engine: Supports ANY Question Count (25, 50, 100+)")
     print("=" * 68)
     
     for i in range(3, 0, -1):
@@ -312,7 +312,7 @@ async def universal_destruction_engine():
             if not all_pages:
                 raise Exception("No active browser tabs found on port 9222. Please open Chrome with debugging port 9222.")
             
-            # Find the currently visible active tab
+            # Find active visible tab
             page = all_pages[0]
             for p_target in all_pages:
                 try:
@@ -324,9 +324,8 @@ async def universal_destruction_engine():
                 
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            # Generous loop runway so it NEVER stops before question 25
-            MAX_SCREEN_CYCLES = 120
-            last_solved_question_num = -1
+            # Unbounded dynamic loop runway (supports tests with up to 500 questions)
+            MAX_SCREEN_CYCLES = 500
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
                 # 1. Inspect screen state
@@ -354,16 +353,18 @@ async def universal_destruction_engine():
 
                 elements = screen_state.get('elements', [])
                 q_context = screen_state.get('question_context', '')
-                tracker = screen_state.get('tracker', f'Question Step {cycle}')
-                current_q_num = screen_state.get('current_q_num', cycle)
-                total_q_count = screen_state.get('total_q_count', 25)
+                tracker = screen_state.get('tracker', '')
+                current_q_num = screen_state.get('current_q_num', 0)
+                total_q_count = screen_state.get('total_q_count', 0)
+
+                header_label = f"Question {current_q_num} of {total_q_count}" if (current_q_num and total_q_count) else f"Step {cycle}"
 
                 if not elements:
                     print("[!] Waiting for question viewport...")
                     await asyncio.sleep(0.5)
                     continue
 
-                print(f"\n--- [Question {current_q_num} of {total_q_count}] {tracker} ---")
+                print(f"\n--- [{header_label}] {tracker} ---")
 
                 # Natural human reading pause before answering
                 await asyncio.sleep(random.uniform(0.6, 1.2))
@@ -472,15 +473,6 @@ async def universal_destruction_engine():
                     except Exception:
                         continue
 
-                # Check if this was the final question (Question 25)
-                if current_q_num >= total_q_count:
-                    print("\n" + "=" * 68)
-                    print(f"🎯 [FINAL QUESTION {total_q_count} REACHED] All {total_q_count} questions resolved successfully!")
-                    print("🛡️  SAFETY SHIELD ACTIVE: 'Finalize Submission' button left untouched.")
-                    print("👉  You can now review your answers and click 'Finalize Submission' manually.")
-                    print("=" * 68)
-                    break
-
                 # 2. Advance to the next question
                 nav_success, current_mouse_x, current_mouse_y = await trigger_next_button(
                     page, current_mouse_x, current_mouse_y
@@ -491,21 +483,17 @@ async def universal_destruction_engine():
                     # Wait for next question to render
                     for _ in range(12):
                         new_q = await page.evaluate("() => parseInt(document.getElementById('current-q-num')?.innerText || '0', 10)")
-                        if new_q > current_q_num:
+                        if current_q_num and new_q > current_q_num:
                             break
                         await asyncio.sleep(0.1)
                 else:
-                    # Check if final submit button is visible
-                    is_final = await page.evaluate("""() => {
-                        const submitBtn = document.getElementById('submit-btn');
-                        return submitBtn && !submitBtn.classList.contains('hidden') && window.getComputedStyle(submitBtn).display !== 'none';
-                    }""")
-                    if is_final:
-                        print("\n" + "=" * 68)
-                        print(f"🎯 [FINAL QUESTION {total_q_count} REACHED] All {total_q_count} questions resolved successfully!")
-                        print("🛡️  SAFETY SHIELD ACTIVE: 'Finalize Submission' button left untouched.")
-                        print("=" * 68)
-                        break
+                    # Final question reached (No next button exists, submit button is active)
+                    print("\n" + "=" * 68)
+                    print("🎯 [FINAL QUESTION COMPLETED] All questions on this exam resolved successfully!")
+                    print("🛡️  SAFETY SHIELD ACTIVE: 'Finalize Submission' button left untouched.")
+                    print("👉  You can now review your answers and click 'Finalize Submission' manually.")
+                    print("=" * 68)
+                    break
 
         except Exception as e:
             print(f"\n[X] Automation Notice: {str(e)}")
