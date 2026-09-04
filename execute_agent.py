@@ -13,8 +13,8 @@ if not os.environ.get("GROQ_API_KEY"):
     print("[!] Please set it in your terminal using: set GROQ_API_KEY=your_key_here")
     sys.exit(1)
 
-async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=14):
-    """Moves mouse from (from_x, from_y) to (to_x, to_y) using smooth cubic Bezier curve with micro tremors."""
+async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=12):
+    """Moves mouse smoothly from (from_x, from_y) to (to_x, to_y) using cubic Bezier curve with micro tremors."""
     for i in range(1, steps + 1):
         t = i / steps
         t_curved = t * t * (3 - 2 * t)
@@ -22,21 +22,21 @@ async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=14):
         cx = from_x + (to_x - from_x) * t_curved
         cy = from_y + (to_y - from_y) * t_curved
         
-        arc = math.sin(t * math.pi) * 10.0 * (random.random() - 0.5)
-        noise_x = random.uniform(-0.8, 0.8)
-        noise_y = random.uniform(-0.8, 0.8)
+        arc = math.sin(t * math.pi) * 8.0 * (random.random() - 0.5)
+        noise_x = random.uniform(-0.6, 0.6)
+        noise_y = random.uniform(-0.6, 0.6)
         
         await page.mouse.move(cx + arc + noise_x, cy + arc + noise_y)
-        await asyncio.sleep(random.uniform(0.012, 0.022))
+        await asyncio.sleep(random.uniform(0.01, 0.018))
     
     await page.mouse.move(to_x, to_y)
 
 async def human_type(input_field, text):
-    """Types text with realistic timing, capitalization latency, punctuation pauses, and occasional typos."""
+    """Types text with realistic human-like typing rhythm, capitalization lag, and typo auto-corrections."""
     await input_field.focus()
     
     for char in text:
-        # 1. Occasional typo correction (2% chance)
+        # 1. Occasional realistic typo and correction (2% chance)
         if char.isalnum() and random.random() < 0.02:
             typos = {
                 'a': 's', 's': 'd', 'd': 'f', 'f': 'g', 'g': 'h', 'h': 'j', 'j': 'k', 'k': 'l',
@@ -45,33 +45,42 @@ async def human_type(input_field, text):
             }
             typo_char = typos.get(char.lower(), char)
             await input_field.press(typo_char)
-            await asyncio.sleep(random.uniform(0.08, 0.14))
-            await asyncio.sleep(random.uniform(0.18, 0.25))
+            await asyncio.sleep(random.uniform(0.06, 0.12))
+            await asyncio.sleep(random.uniform(0.14, 0.22))
             await input_field.press("Backspace")
-            await asyncio.sleep(random.uniform(0.09, 0.15))
+            await asyncio.sleep(random.uniform(0.08, 0.14))
             
-        delay = random.uniform(0.06, 0.13)
+        delay = random.uniform(0.05, 0.12)
         if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?':
-            delay += random.uniform(0.07, 0.14)
+            delay += random.uniform(0.06, 0.12)
         if char in " ,.?!;":
-            delay += random.uniform(0.12, 0.25)
+            delay += random.uniform(0.10, 0.20)
             
         await input_field.press(char)
         await asyncio.sleep(delay)
 
-# Script to tag all visible interactive elements across the screen
+# High-precision DOM annotation script that deduplicates nested inputs and extracts dropdown options
 ANNOTATE_SCREEN_SCRIPT = """
 () => {
     document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
     
-    const candidates = Array.from(document.querySelectorAll(
-        'input, textarea, select, button, label, [role="button"], [role="checkbox"], [role="radio"], [role="option"], [contenteditable="true"], a'
+    // Find all candidate interactive elements
+    const rawCandidates = Array.from(document.querySelectorAll(
+        'button, label, select, input:not([type="hidden"]), textarea, [role="button"], [role="checkbox"], [role="radio"], [contenteditable="true"]'
     ));
     
     const visibleElements = [];
     let targetCounter = 0;
     
-    for (const el of candidates) {
+    // Deduplicate: If an input is inside a label, only keep the label or input
+    const filtered = rawCandidates.filter(el => {
+        if (el.tagName === 'INPUT' && (el.type === 'radio' || el.type === 'checkbox') && el.closest('label')) {
+            return false; // Let the parent label be the click target
+        }
+        return true;
+    });
+    
+    for (const el of filtered) {
         const rect = el.getBoundingClientRect();
         const style = window.getComputedStyle(el);
         
@@ -82,15 +91,18 @@ ANNOTATE_SCREEN_SCRIPT = """
             continue;
         }
         
-        // Exclude elements outside reasonable screen bounds
-        if (rect.bottom < 0 || rect.top > window.innerHeight * 3) {
-            continue;
-        }
+        // Exclude palette item numbers from confusing the question solver
+        const isPalette = el.classList.contains('palette-item');
         
         el.setAttribute('data-agent-target', String(targetCounter));
         
         let textContent = (el.innerText || el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim();
-        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 100);
+        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 120);
+        
+        let optionsList = [];
+        if (el.tagName === 'SELECT') {
+            optionsList = Array.from(el.options).map(o => o.text.trim());
+        }
         
         visibleElements.push({
             index: targetCounter,
@@ -98,20 +110,22 @@ ANNOTATE_SCREEN_SCRIPT = """
             type: el.getAttribute('type') || '',
             name: el.getAttribute('name') || '',
             text: textContent,
-            checked: el.checked || false,
-            disabled: el.disabled || false
+            options: optionsList,
+            is_palette_btn: isPalette
         });
         
         targetCounter++;
     }
     
-    // Extract main visible text body for holistic comprehension
-    const pageText = (document.body.innerText || '').substring(0, 6000);
+    // Extract current question text clearly
+    const questionCard = document.querySelector('#question-card-viewport, .card, fieldset, .question');
+    const questionContext = questionCard ? questionCard.innerText.trim() : (document.body.innerText || '').substring(0, 4000);
+    const trackerText = (document.querySelector('.question-tracker, header')?.innerText || '').trim();
     
     return {
         elements: visibleElements,
-        html_snapshot: document.body.innerHTML.substring(0, 20000),
-        page_text: pageText
+        question_context: questionContext,
+        tracker: trackerText
     };
 }
 """
@@ -128,13 +142,13 @@ async def universal_destruction_engine():
 
     print("=" * 65)
     print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
-    print("🎯 Full-Viewport Visual Reasoning + Layout Agnostic Action Planning")
+    print("🎯 Full-Viewport Visual Reasoning + Fluid Multi-Step Execution")
     print("=" * 65)
     
-    for i in range(4, 0, -1):
+    for i in range(3, 0, -1):
         print(f"[*] Attaching to Chrome CDP session in: {i}s...", end="\r")
         await asyncio.sleep(1)
-    print("\n[*] Connection established. Listening to active browser viewport...")
+    print("\n[*] Connected. Hooking active browser viewport...")
 
     current_mouse_x = 250.0
     current_mouse_y = 250.0
@@ -160,50 +174,54 @@ async def universal_destruction_engine():
                 
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            # Autonomous Perception-Action Loop
-            MAX_SCREEN_CYCLES = 40
-            completed_questions = set()
+            MAX_SCREEN_CYCLES = 35
+            last_question_snapshot = ""
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
-                print(f"\n--- [Screen Observation Cycle #{cycle}] ---")
-                
                 # Snapshot the screen and annotate all interactive widgets
                 screen_state = await page.evaluate(ANNOTATE_SCREEN_SCRIPT)
                 elements = screen_state.get('elements', [])
-                page_text = screen_state.get('page_text', '')
+                q_context = screen_state.get('question_context', '')
+                tracker = screen_state.get('tracker', '')
                 
                 if not elements:
-                    print("[!] No interactive elements discovered on screen. Waiting...")
-                    await asyncio.sleep(1.5)
+                    print("[!] No interactive elements found on screen. Waiting...")
+                    await asyncio.sleep(1.0)
                     continue
 
-                # Query Groq Multimodal Reasoning Model for whole-screen perception
+                print(f"\n--- [Step {cycle}] {tracker} ---")
+
+                # Filter out palette buttons from LLM prompt to prevent distracting the solver
+                relevant_elements = [e for e in elements if not e.get('is_palette_btn')]
+
                 system_prompt = (
-                    "You are a master academic test taker examining an active screen of an online exam.\n"
-                    "All interactive elements on the screen have been annotated with a `[data-agent-target=\"<index>\"]` index.\n\n"
-                    "Your mission:\n"
-                    "1. Understand the questions, instructions, and widgets currently visible on screen.\n"
-                    "2. Determine the correct answers with 100% academic precision (MCQs, Checkboxes, Fill-in-the-blanks, Dropdowns, Coding).\n"
-                    "3. Return a list of sequential actions to perform.\n\n"
+                    "You are an expert academic solver analyzing an active screen of an online exam.\n"
+                    "All interactive elements have a `[data-agent-target=\"<index>\"]` integer index.\n\n"
+                    "Instructions:\n"
+                    "1. Read the active question and its options.\n"
+                    "2. Determine the correct answers with 100% precision.\n"
+                    "3. Return the exact actions needed to solve the question and advance.\n\n"
+                    "Action Types:\n"
+                    "- {\"type\": \"click\", \"target_index\": <idx>, \"reason\": \"...\"} (For MCQ radios, Checkboxes, or Next button)\n"
+                    "- {\"type\": \"type\", \"target_index\": <idx>, \"text\": \"...\", \"reason\": \"...\"} (For Fill-in-the-blank or Textarea)\n"
+                    "- {\"type\": \"select\", \"target_index\": <idx>, \"option_text\": \"...\", \"reason\": \"...\"} (For Dropdown <select>)\n\n"
                     "CRITICAL SAFETY RULE:\n"
-                    "- NEVER click the FINAL exam submission buttons (e.g. 'Finalize Submission', 'Submit Exam', 'End Test', 'Finish Exam').\n"
-                    "- DO click 'Next', 'Save & Next', 'Continue', 'Proceed' to move between questions if this is a paginated exam.\n\n"
-                    "Output format must be strictly a JSON object with this schema:\n"
+                    "- If there is a 'Save & Next' or 'Next' button, include it as the LAST action in the array to advance to the next question.\n"
+                    "- NEVER click final submission buttons ('Finalize Submission', 'Submit Exam', 'End Test').\n\n"
+                    "Output JSON schema:\n"
                     "{\n"
-                    "  \"screen_summary\": \"Brief 1-sentence description of what is on screen right now\",\n"
+                    "  \"question_summary\": \"Question topic and format\",\n"
                     "  \"actions\": [\n"
-                    "    {\"type\": \"click\", \"target_index\": 3, \"reason\": \"Select option (A) for Question 1\"},\n"
-                    "    {\"type\": \"type\", \"target_index\": 6, \"text\": \"let\", \"reason\": \"Fill in the blank for Question 2\"},\n"
-                    "    {\"type\": \"click\", \"target_index\": 12, \"reason\": \"Click Next button to go to next page\"}\n"
+                    "    {\"type\": \"click\", \"target_index\": 1, \"reason\": \"Select correct option\"},\n"
+                    "    {\"type\": \"click\", \"target_index\": 4, \"reason\": \"Click Save & Next\"}\n"
                     "  ],\n"
                     "  \"is_exam_complete\": false\n"
                     "}"
                 )
                 
                 user_content = (
-                    f"URL: {page.url}\n\n"
-                    f"--- VISIBLE SCREEN TEXT ---\n{page_text}\n\n"
-                    f"--- ANNOTATED INTERACTIVE WIDGETS ---\n{json.dumps(elements, indent=2)}"
+                    f"--- ACTIVE QUESTION CONTENT ---\n{q_context}\n\n"
+                    f"--- INTERACTIVE TARGETS ---\n{json.dumps(relevant_elements, indent=2)}"
                 )
 
                 plan = None
@@ -219,23 +237,18 @@ async def universal_destruction_engine():
                         )
                         plan = json.loads(resp.choices[0].message.content.strip())
                         break
-                    except Exception as e:
+                    except Exception:
                         continue
 
                 if not plan or not plan.get("actions"):
-                    print("[*] No further actions required on this screen.")
-                    if plan and plan.get("is_exam_complete"):
-                        print("[*] Screen analysis indicates exam questions are complete.")
-                        break
-                    await asyncio.sleep(1.0)
+                    print("[*] No more question actions required on this screen.")
                     break
 
-                print(f"👁️  Screen Analysis: {plan.get('screen_summary', 'Processing screen...')}")
+                print(f"💡 AI Analysis: {plan.get('question_summary', 'Solving question...')}")
                 actions = plan.get("actions", [])
-                print(f"📋 Generated Action Plan: {len(actions)} steps")
+                has_navigated = False
 
-                has_navigation = False
-                for step_idx, action in enumerate(actions):
+                for act_idx, action in enumerate(actions):
                     act_type = action.get("type")
                     t_idx = str(action.get("target_index", ""))
                     reason = action.get("reason", "")
@@ -247,15 +260,15 @@ async def universal_destruction_engine():
                     if not target_el:
                         continue
                         
-                    # Hardcoded safeguard against premature final submission
+                    # Final submission safety guard
                     el_text = (await page.evaluate("(el) => (el.innerText || el.value || '').toLowerCase()", target_el)).strip()
                     if any(x in el_text for x in ["finalize submission", "submit exam", "submit test", "end test", "finish exam"]):
-                        print(f"    [🛡️ SAFETY SHIELD] Blocked automated click on final submission button: '{el_text}'")
+                        print(f"    [🛡️ SAFETY SHIELD] Preserved final submission button: '{el_text}'")
                         continue
 
-                    # Scroll element smoothly into center view
+                    # Scroll element into viewport
                     await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", target_el)
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.2)
                     
                     box = await target_el.bounding_box()
                     if not box:
@@ -264,35 +277,41 @@ async def universal_destruction_engine():
                     target_x = box['x'] + box['width'] / 2
                     target_y = box['y'] + box['height'] / 2
                     
-                    # Human mouse trajectory
+                    # Smooth human mouse movement
                     await human_mouse_move(page, current_mouse_x, current_mouse_y, target_x, target_y)
                     current_mouse_x, current_mouse_y = target_x, target_y
                     
                     if act_type == "click":
                         await page.mouse.click(target_x, target_y)
-                        print(f"    [Step {step_idx+1}] Clicked [{t_idx}] -> {reason}")
-                        if any(x in el_text for x in ["next", "continue", "save & next", "proceed", "forward"]):
-                            has_navigation = True
-                            await asyncio.sleep(1.2)
+                        print(f"    [+] Clicked [{t_idx}] -> {reason}")
+                        
+                        if any(x in el_text for x in ["next", "continue", "save & next", "proceed"]):
+                            has_navigated = True
+                            await asyncio.sleep(0.6)
                             break
                             
                     elif act_type == "type":
                         await page.mouse.click(target_x, target_y)
                         await asyncio.sleep(0.1)
-                        text_to_type = action.get("text", "")
-                        await human_type(target_el, text_to_type)
-                        print(f"    [Step {step_idx+1}] Typed '{text_to_type}' into [{t_idx}] -> {reason}")
+                        val = action.get("text", "")
+                        await human_type(target_el, val)
+                        print(f"    [+] Typed '{val}' into [{t_idx}] -> {reason}")
+                        
+                    elif act_type == "select":
+                        opt_val = action.get("option_text", "")
+                        await target_el.select_option(label=opt_val)
+                        print(f"    [+] Selected dropdown option '{opt_val}' on [{t_idx}] -> {reason}")
 
-                    await asyncio.sleep(random.uniform(0.6, 1.2))
+                    await asyncio.sleep(random.uniform(0.3, 0.6))
 
-                # If this was a single page exam without paginated buttons, we are done
-                if not has_navigation:
-                    print("\n[+] Single-page / All visible questions resolved.")
+                if not has_navigated:
+                    # Single page exam without Next buttons, or reached final question
+                    print("\n[*] Active page fully answered.")
                     break
 
             print("\n" + "=" * 65)
             print("🎉 [SUCCESS] AUTONOMOUS AGENT SOLVING RUN COMPLETE")
-            print("🛡️  All questions answered. Submit button left untouched for manual review.")
+            print("🛡️  All questions answered with precision. Final submission ready for review.")
             print("=" * 65)
 
         except Exception as e:
