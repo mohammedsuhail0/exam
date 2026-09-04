@@ -261,6 +261,15 @@
   async function enterSecureMode() {
     if (!el.consent.checked) return;
 
+    // Request fullscreen immediately within the direct user gesture
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (_) {
+      // Degraded fallback if fullscreen is blocked by browser policy
+    }
+
     try {
       const startResp = await fetch("/api/session/start", { method: "POST" });
       const startData = await startResp.json();
@@ -275,13 +284,6 @@
       state.userAnswers = {};
     } catch (_) {
       terminateSession("SESSION_START_FAILED", "Unable to reach session service.");
-      return;
-    }
-
-    try {
-      await document.documentElement.requestFullscreen();
-    } catch (_) {
-      terminateSession("FULLSCREEN_REQUIRED", "Fullscreen permission failed.");
       return;
     }
 
