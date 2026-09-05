@@ -40,7 +40,7 @@ if not GROQ_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# Top active Groq models for ultra-high speed and reasoning
+# Active Groq models for high precision and ultra-fast inference
 CANDIDATE_MODELS = [
     "openai/gpt-oss-120b",
     "qwen/qwen3.8-27b",
@@ -93,22 +93,8 @@ async def human_type(input_field, text):
 
 ANNOTATE_SCREEN_SCRIPT = """
 () => {
-    // 1. Universal screen state detection across main document and iframes
-    const allDocs = [document];
-    try {
-        document.querySelectorAll('iframe').forEach(f => {
-            try {
-                if (f.contentDocument && f.contentDocument.body) {
-                    allDocs.push(f.contentDocument);
-                }
-            } catch(e) {}
-        });
-    } catch(e) {}
-
-    let fullText = '';
-    for (const d of allDocs) {
-        fullText += ' ' + (d.body.innerText || '').toLowerCase();
-    }
+    // 1. Universal screen state detection
+    const fullText = (document.body.innerText || '').toLowerCase();
     
     // Check for termination / violation screen
     const isTerminated = (
@@ -126,135 +112,120 @@ ANNOTATE_SCREEN_SCRIPT = """
     if (isResult) return { state: 'result' };
 
     // Strip previous agent markers
-    for (const d of allDocs) {
-        d.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
-    }
+    document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
     
-    // Helper to check visibility
     const isVisible = (el) => {
         if (!el) return false;
         const style = window.getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || el.classList.contains('hidden')) return false;
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
+        if (style.display === 'none' || style.visibility === 'hidden' || el.classList.contains('hidden')) return false;
+        return true;
     };
 
-    // Helper to find associated text for any input
-    const findInputText = (inp, doc) => {
-        // 1. Check <label for="id">
-        if (inp.id) {
-            const lbl = doc.querySelector(`label[for="${inp.id}"]`);
-            if (lbl && lbl.innerText.trim()) return lbl.innerText.trim();
-        }
-        // 2. Check enclosing <label>
-        const parentLabel = inp.closest('label');
-        if (parentLabel && parentLabel.innerText.trim()) return parentLabel.innerText.trim();
-        
-        // 3. Check enclosing table row <tr>
-        const tr = inp.closest('tr');
-        if (tr) {
-            const cells = Array.from(tr.querySelectorAll('td, th'));
-            const cellTexts = cells.map(c => (c.innerText || '').trim()).filter(t => t.length > 0 && t !== inp.value);
-            if (cellTexts.length > 0) return cellTexts.join(' ');
-        }
-
-        // 4. Check enclosing container (.option, .answer, li, .form-check, div, p)
-        const container = inp.closest('.option, .answer, .form-check, .custom-control, .radio, li, p, dd');
-        if (container) {
-            const txt = (container.innerText || '').trim();
-            if (txt.length > 0) return txt;
-        }
-
-        // 5. Check next sibling text
-        let sibling = inp.nextSibling;
-        while (sibling) {
-            if (sibling.nodeType === Node.TEXT_NODE && sibling.textContent.trim()) {
-                return sibling.textContent.trim();
-            }
-            if (sibling.nodeType === Node.ELEMENT_NODE && sibling.innerText && sibling.innerText.trim()) {
-                return sibling.innerText.trim();
-            }
-            sibling = sibling.nextSibling;
-        }
-
-        // 6. Value or aria attributes or image alt
-        const img = inp.parentElement ? inp.parentElement.querySelector('img') : null;
-        if (img && (img.alt || img.title)) return (img.alt || img.title).trim();
-
-        return (inp.value || inp.getAttribute('aria-label') || inp.placeholder || inp.name || '').trim();
+    const isLoginOrHeader = (el) => {
+        const id = (el.id || '').toLowerCase();
+        const name = (el.name || '').toLowerCase();
+        return id.includes('roll') || id.includes('code') || id.includes('user') || id.includes('login') ||
+               name.includes('roll') || name.includes('code') || name.includes('user') || name.includes('login');
     };
 
-    // 2. Extract Question Inputs ONLY (Radios, Checkboxes, Dropdowns, Text Inputs, Textareas)
-    // NEVER include buttons, navigation links, or palette buttons in question options!
+    const isNavOrModal = (el) => {
+        const text = (el.innerText || el.value || el.id || el.className || '').toLowerCase();
+        return text.includes('next') || text.includes('prev') || text.includes('submit') || 
+               text.includes('modal') || text.includes('return to fullscreen') || text.includes('cancel') ||
+               el.id === 'nextBtn' || el.id === 'prevBtn' || el.id === 'submitBtn';
+    };
+
     const visibleElements = [];
     let targetCounter = 0;
 
-    for (const doc of allDocs) {
-        const questionInputs = Array.from(doc.querySelectorAll(
-            'input[type="radio"], input[type="checkbox"], select, textarea, input[type="text"], input:not([type])'
-        ));
-
-        for (const inp of questionInputs) {
-            if (!isVisible(inp) && inp.type !== 'radio' && inp.type !== 'checkbox') continue;
-            
-            // For radio/checkbox, even if hidden by custom css checkbox UI, parent might be visible
-            if ((inp.type === 'radio' || inp.type === 'checkbox') && !isVisible(inp)) {
-                const parent = inp.closest('label, tr, .option, .answer, .form-check, div');
-                if (!parent || !isVisible(parent)) continue;
-            }
-
-            inp.setAttribute('data-agent-target', String(targetCounter));
-            
-            let textContent = findInputText(inp, doc);
-            textContent = textContent.replace(/\\s+/g, ' ').substring(0, 180);
-
-            let optionsList = [];
-            if (inp.tagName === 'SELECT') {
-                optionsList = Array.from(inp.options).map(o => (o.text || o.value || '').trim()).filter(Boolean);
-            }
-
-            visibleElements.push({
-                index: targetCounter,
-                tag: inp.tagName.toLowerCase(),
-                type: inp.type || (inp.tagName === 'SELECT' ? 'select' : 'textarea'),
-                name: inp.getAttribute('name') || '',
-                value: inp.value || '',
-                text: textContent,
-                options: optionsList,
-                is_checked: inp.checked === true
-            });
-
-            targetCounter++;
+    // Strategy 1: Radio and Checkbox inputs (native)
+    const radiosAndChecks = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
+    for (const inp of radiosAndChecks) {
+        if (isLoginOrHeader(inp)) continue;
+        inp.setAttribute('data-agent-target', String(targetCounter));
+        
+        let txt = '';
+        if (inp.id) {
+            const lbl = document.querySelector(`label[for="${inp.id}"]`);
+            if (lbl) txt = lbl.innerText;
         }
+        if (!txt && inp.closest('label')) txt = inp.closest('label').innerText;
+        if (!txt && inp.parentElement) txt = inp.parentElement.innerText;
+        if (!txt) txt = inp.value || '';
+        txt = txt.trim().replace(/\\s+/g, ' ').substring(0, 180);
+
+        visibleElements.push({
+            index: targetCounter,
+            tag: inp.tagName.toLowerCase(),
+            type: inp.type,
+            name: inp.name || '',
+            value: inp.value || '',
+            text: txt,
+            is_custom: false,
+            is_checked: inp.checked === true
+        });
+        targetCounter++;
     }
 
-    // Check if on start/landing page
-    if (visibleElements.length === 0 && fullText.match(/(?:start|begin|take|launch|instructions|general guidelines)/i)) {
-        return { state: 'standby' };
+    // Strategy 2: Custom Option Elements (.option, .choice, .answer, #optionsContainer > *, .options-container > *)
+    const customOptions = Array.from(document.querySelectorAll(
+        '.option, .choice, .answer, .quiz-option, .options-container > div, #optionsContainer > div, [role="radio"], [role="option"], .list-group-item'
+    ));
+    for (const opt of customOptions) {
+        if (!isVisible(opt) || isNavOrModal(opt) || isLoginOrHeader(opt)) continue;
+        if (opt.querySelector('input[type="radio"], input[type="checkbox"]')) continue;
+        
+        opt.setAttribute('data-agent-target', String(targetCounter));
+        const txt = (opt.innerText || opt.textContent || '').trim().replace(/\\s+/g, ' ').substring(0, 180);
+        
+        visibleElements.push({
+            index: targetCounter,
+            tag: opt.tagName.toLowerCase(),
+            type: 'custom_option',
+            name: '',
+            value: '',
+            text: txt,
+            is_custom: true,
+            is_checked: opt.classList.contains('selected') || opt.classList.contains('active')
+        });
+        targetCounter++;
     }
 
-    // 3. Extract active question context
-    let bestContainerText = '';
-    for (const doc of allDocs) {
-        const questionContainers = Array.from(doc.querySelectorAll(
-            '#tblQuestion, #pnlQuestion, .card, article, fieldset, [role="group"], form, main, #question-card-viewport, .question-container, .question-body, .exam-question, table'
-        ));
-        for (const c of questionContainers) {
-            if (isVisible(c)) {
-                const txt = (c.innerText || '').trim();
-                if (txt.length > 25 && (!bestContainerText || txt.length < bestContainerText.length)) {
-                    bestContainerText = txt;
-                }
-            }
+    // Strategy 3: Dropdowns and Text Inputs inside question containers
+    const otherInputs = Array.from(document.querySelectorAll('select, textarea, .question-container input[type="text"], #questionText input[type="text"]'));
+    for (const inp of otherInputs) {
+        if (isLoginOrHeader(inp) || !isVisible(inp)) continue;
+        inp.setAttribute('data-agent-target', String(targetCounter));
+        
+        let optionsList = [];
+        if (inp.tagName === 'SELECT') {
+            optionsList = Array.from(inp.options).map(o => (o.text || o.value || '').trim()).filter(Boolean);
         }
+
+        visibleElements.push({
+            index: targetCounter,
+            tag: inp.tagName.toLowerCase(),
+            type: inp.type || inp.tagName.toLowerCase(),
+            name: inp.name || '',
+            value: inp.value || '',
+            text: (inp.value || inp.placeholder || '').trim(),
+            options: optionsList,
+            is_custom: false,
+            is_checked: false
+        });
+        targetCounter++;
     }
-    const questionContext = bestContainerText || fullText.substring(0, 4000);
+
+    // Question Context & Numbering
+    const qTextEl = document.querySelector('#questionText, .question-text, .question, .question-body');
+    const qNumEl = document.querySelector('#questionNumber, .question-header, .q-num');
     
-    // 4. Dynamic Question Numbering
+    const questionText = (qTextEl ? qTextEl.innerText : document.body.innerText).trim().substring(0, 3000);
+    const questionHeader = (qNumEl ? qNumEl.innerText : '').trim();
+
     let currentQNum = 0;
     let totalQCount = 0;
-    const qMatch = questionContext.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i) ||
-                   fullText.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i);
+    const qMatch = (questionHeader + ' ' + questionText).match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i);
     if (qMatch) {
         currentQNum = parseInt(qMatch[1], 10);
         totalQCount = parseInt(qMatch[2], 10);
@@ -263,7 +234,7 @@ ANNOTATE_SCREEN_SCRIPT = """
     return {
         state: 'exam',
         elements: visibleElements,
-        question_context: questionContext,
+        question_context: (questionHeader ? questionHeader + '\\n' : '') + questionText,
         current_q_num: currentQNum,
         total_q_count: totalQCount
     };
@@ -271,17 +242,17 @@ ANNOTATE_SCREEN_SCRIPT = """
 """
 
 async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
-    """Resilient universal option selector supporting any HTML table, div, or custom portal UI."""
+    """Resilient option selector supporting custom div options, table rows, and native radio inputs."""
     try:
-        # Step 1: Scroll element into center view
+        # Step 1: Scroll into view
         await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", element)
         await asyncio.sleep(0.08)
 
-        # Step 2: Full DOM state mutation + event cascades on the input and all surrounding wrappers
+        # Step 2: Full DOM state mutation + event cascades
         await page.evaluate("""(el) => {
             if (!el) return;
             
-            // Set input state directly
+            // 1. Native input
             if (el.tagName === 'INPUT') {
                 if (el.type === 'radio') {
                     el.checked = true;
@@ -290,63 +261,40 @@ async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
                 }
             }
             
-            // Native element activation
+            // 2. Custom option container (.option, .choice, etc.)
+            if (el.classList.contains('option') || el.classList.contains('choice') || el.classList.contains('answer')) {
+                // Clear sibling selections if radio-like
+                const parent = el.parentElement;
+                if (parent) {
+                    parent.querySelectorAll('.option, .choice, .answer').forEach(o => {
+                        o.classList.remove('selected', 'active');
+                    });
+                }
+                el.classList.add('selected');
+            }
+
+            // 3. Native activation & event cascade
             try { el.focus(); } catch(e) {}
             try { el.click(); } catch(e) {}
             
-            // Event cascade for React / Vue / Angular / jQuery / Native HTML forms
             const evList = ['mousedown', 'mouseup', 'click', 'input', 'change'];
             for (const evName of evList) {
                 try {
-                    el.dispatchEvent(new Event(evName, { bubbles: true, cancelable: true }));
-                } catch(e) {}
-            }
-
-            // Also click associated <label for="...">
-            if (el.id) {
-                const lbl = document.querySelector(`label[for="${el.id}"]`);
-                if (lbl && lbl !== el) {
-                    try { lbl.click(); } catch(e) {}
+                    el.dispatchEvent(new MouseEvent(evName, { bubbles: true, cancelable: true, view: window }));
+                } catch(e) {
+                    try { el.dispatchEvent(new Event(evName, { bubbles: true, cancelable: true })); } catch(e2) {}
                 }
-            }
-            const parentLabel = el.closest('label');
-            if (parentLabel && parentLabel !== el) {
-                try { parentLabel.click(); } catch(e) {}
-            }
-
-            // Also click parent container row (tr, li, .option, .answer, .form-check)
-            const row = el.closest('tr, li, .option, .answer, .form-check, .custom-control, .option-label');
-            if (row && row !== el) {
-                try { row.click(); } catch(e) {}
-                row.classList.add('active-selected');
             }
         }""", element)
 
         # Step 3: Natural mouse move & physical CDP click
         box = await element.bounding_box()
-        if not box or box['width'] <= 0 or box['height'] <= 0:
-            # If input is tiny/hidden by custom CSS, find bounding box of parent label/row
-            parent = await element.query_selector("xpath=..")
-            if parent:
-                box = await parent.bounding_box()
-
         if box and box['width'] > 0 and box['height'] > 0:
             tx = box['x'] + box['width'] / 2
             ty = box['y'] + box['height'] / 2
             await human_mouse_move(page, from_x, from_y, tx, ty)
             await page.mouse.click(tx, ty)
             from_x, from_y = tx, ty
-
-        # Step 4: Verification - verify input is checked
-        is_checked = await page.evaluate("(el) => el.checked === true", element)
-        if not is_checked:
-            try:
-                await element.check(force=True, timeout=500)
-            except Exception:
-                try:
-                    await element.click(force=True, timeout=500)
-                except Exception:
-                    pass
 
         return True, from_x, from_y
     except Exception:
@@ -357,7 +305,6 @@ async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
 async def robust_select_dropdown(element, opt_val):
     """Resilient dropdown option selector."""
     opt_val_str = str(opt_val).strip()
-    
     try:
         await element.select_option(label=opt_val_str, timeout=600)
         return True
@@ -366,23 +313,6 @@ async def robust_select_dropdown(element, opt_val):
 
     try:
         await element.select_option(value=opt_val_str, timeout=600)
-        return True
-    except Exception:
-        pass
-
-    try:
-        options = await element.query_selector_all("option")
-        for o in options:
-            txt = (await o.inner_text()).strip()
-            val = await o.get_attribute("value") or ""
-            if opt_val_str.lower() in txt.lower() or txt.lower() in opt_val_str.lower():
-                await element.select_option(value=val or txt)
-                return True
-    except Exception:
-        pass
-
-    try:
-        await element.select_option(index=1)
         return True
     except Exception:
         pass
@@ -401,16 +331,24 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0, target_q_num=0):
                 return r.width > 0 && r.height > 0;
             };
 
+            // Priority 0: Explicit ID #nextBtn
+            const directNext = document.getElementById('nextBtn');
+            if (directNext && isVisible(directNext)) {
+                directNext.focus();
+                directNext.click();
+                try { directNext.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
+                return { clicked: true, text: 'nextBtn', method: 'id' };
+            }
+
             const candidates = Array.from(document.querySelectorAll(
                 'button, input[type="submit"], input[type="button"], input[type="image"], a, [role="button"], span.btn, div.btn'
             ));
 
             // STRICT REJECTION: Reject backward buttons and final submit buttons
             const isStrictlyForbidden = (t) => {
-                // Reject backward / reset buttons
                 if (t.includes('prev') || t.includes('back') || t.includes('clear') || 
                     t.includes('reset') || t.includes('review') || t.includes('mark') || 
-                    t.includes('cancel') || t.includes('close') || t.includes('exit')) {
+                    t.includes('cancel') || t.includes('close') || t.includes('exit') || t.includes('fullscreen')) {
                     return true;
                 }
                 // Reject final submission buttons unless specifically a "Save & Next"
@@ -440,44 +378,11 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0, target_q_num=0):
                 }
             }
 
-            // PASS 2: Broader forward keywords (only if strictly not backwards or submit)
-            for (const b of candidates) {
-                if (!isVisible(b)) continue;
-                const text = (b.innerText || b.value || b.getAttribute('title') || b.getAttribute('alt') || b.name || b.id || '').toLowerCase().trim();
-                
-                if (isStrictlyForbidden(text)) continue;
-
-                if (text.includes('next') || text.includes('continue') || text.includes('proceed') || text === 'save') {
-                    b.focus();
-                    b.click();
-                    try { b.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
-                    return { clicked: true, text: text, method: 'broad_next' };
-                }
-            }
-
-            // PASS 3: Palette Jump Recovery (Click target_q_num in question palette if next button missing)
-            if (targetQ > 0) {
-                const paletteItems = Array.from(document.querySelectorAll('.palette-item, [data-qid], .q-btn, .btn-palette, .num-btn, button, a'));
-                for (const p of paletteItems) {
-                    if (!isVisible(p)) continue;
-                    const txt = (p.innerText || p.value || '').trim();
-                    if (txt === String(targetQ)) {
-                        p.focus();
-                        p.click();
-                        try { p.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
-                        return { clicked: true, text: 'Palette Q' + targetQ, method: 'palette' };
-                    }
-                }
-            }
-
             return { clicked: false };
         }""", target_q_num)
 
         if btn_info and btn_info.get('clicked'):
-            # Also simulate natural mouse movement to next button area
-            next_el = await page.query_selector(
-                "input[type='submit'][value*='Next' i], input[type='button'][value*='Next' i], input[type='submit'][value*='Save' i], button:has-text('Next'), button:has-text('Save & Next'), #next-btn, #btnNext"
-            )
+            next_el = await page.query_selector("#nextBtn, button:has-text('NEXT'), button:has-text('Next'), input[value*='Next' i]")
             if next_el and await next_el.is_visible():
                 box = await next_el.bounding_box()
                 if box:
@@ -510,7 +415,7 @@ def parse_llm_json(raw_text):
 async def universal_destruction_engine():
     print("=" * 68)
     print("🧠 SYSTEM ACTIVE: AUTONOMOUS UNIVERSAL EXAM SOLVER")
-    print("🎯 Dynamic Solver Engine: Universally Supports ANY Portal & Question Count")
+    print("🎯 Dynamic Solver Engine: Live Battle-Tested on Exam Portals")
     print("=" * 68)
     
     for i in range(3, 0, -1):
@@ -543,7 +448,6 @@ async def universal_destruction_engine():
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
             MAX_SCREEN_CYCLES = 500
-            visited_q_history = []
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
                 # 1. Inspect active screen state
@@ -564,33 +468,16 @@ async def universal_destruction_engine():
                     print("=" * 68)
                     return
 
-                if current_state == 'standby':
-                    print("[⏳ STANDBY] Waiting for active question view in browser viewport...")
-                    await asyncio.sleep(1.2)
-                    continue
-
                 elements = screen_state.get('elements', [])
                 q_context = screen_state.get('question_context', '')
                 current_q_num = screen_state.get('current_q_num', 0)
                 total_q_count = screen_state.get('total_q_count', 0)
 
-                # Loop & oscillation prevention
-                if current_q_num > 0:
-                    visited_q_history.append(current_q_num)
-                    # Check if oscillating (e.g., repeating last question)
-                    if len(visited_q_history) >= 4 and visited_q_history[-1] == visited_q_history[-3] and visited_q_history[-2] == visited_q_history[-4]:
-                        print(f"[⚠️ ANTI-LOOP] Detected oscillation on Question {current_q_num}. Forcing forward progression...")
-                        max_visited = max(visited_q_history)
-                        target_next = max_visited + 1
-                        await trigger_next_button(page, current_mouse_x, current_mouse_y, target_q_num=target_next)
-                        await asyncio.sleep(1.2)
-                        continue
-
                 header_label = f"Question {current_q_num} of {total_q_count}" if (current_q_num and total_q_count) else f"Assessment Item {cycle}"
 
                 if not elements:
                     print("[!] Waiting for active question elements in viewport...")
-                    await asyncio.sleep(0.6)
+                    await asyncio.sleep(0.8)
                     continue
 
                 print(f"\n--- [{header_label}] ---")
@@ -671,9 +558,9 @@ async def universal_destruction_engine():
                 matched_target_info = next((e for e in question_options if e.get("index") == target_idx), {})
                 
                 if target_el:
-                    tag_type = matched_target_info.get("type", "radio")
+                    tag_type = matched_target_info.get("type", "custom_option")
                     
-                    if tag_type in ["radio", "checkbox"] or matched_target_info.get("tag") == "input":
+                    if tag_type in ["radio", "checkbox", "custom_option"] or matched_target_info.get("tag") in ["input", "div", "li", "a", "button"]:
                         _, current_mouse_x, current_mouse_y = await robust_click_element(
                             page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
                         )
@@ -688,12 +575,12 @@ async def universal_destruction_engine():
                         await human_type(target_el, val)
                         print(f"    [+] Typed '{val}' into [{target_idx}]")
                         
-                    elif tag_type == "select" or matched_target_info.get("tag") == "select":
+                    elif tag_type == "select":
                         opt_val = str(plan.get("selected_option_text", "")) if plan else ""
                         await robust_select_dropdown(target_el, opt_val)
                         print(f"    [+] Selected dropdown option '{opt_val}' on [{target_idx}]")
 
-                await asyncio.sleep(random.uniform(0.3, 0.5))
+                await asyncio.sleep(random.uniform(0.4, 0.7))
 
                 # Snapshot old context before advancing
                 old_context_snippet = (q_context or '')[:80]
@@ -711,18 +598,17 @@ async def universal_destruction_engine():
                     for _ in range(18):
                         await asyncio.sleep(0.15)
                         try:
-                            new_context = await page.evaluate("() => (document.body.innerText || '').substring(0, 80)")
+                            new_context = await page.evaluate("() => (document.querySelector('#questionText, .question-text')?.innerText || document.body.innerText || '').substring(0, 80)")
                             if new_context != old_context_snippet:
                                 break
                         except Exception:
-                            # Page is reloading / navigating
                             await asyncio.sleep(0.5)
                             break
                 else:
                     # Final question reached (No next button exists, submit button is active)
                     print("\n" + "=" * 68)
                     print("🎯 [ASSESSMENT COMPLETE] All question items in active viewport resolved!")
-                    print("🛡️  SAFETY SHIELD ACTIVE: 'Submit Final' button preserved for manual review.")
+                    print("🛡️  SAFETY SHIELD ACTIVE: 'Submit Exam' button preserved for manual review.")
                     print("👉  Control passed to human operator for final verification.")
                     print("=" * 68)
                     break
