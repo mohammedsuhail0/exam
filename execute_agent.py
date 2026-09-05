@@ -40,12 +40,13 @@ if not GROQ_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY)
 
+# Top active Groq models for ultra-high speed and reasoning
 CANDIDATE_MODELS = [
     "openai/gpt-oss-120b",
     "qwen/qwen3.8-27b",
     "qwen/qwen3.6-27b",
     "openai/gpt-oss-20b",
-    "llama-3.3-70b-versatile"
+    "groq/compound"
 ]
 
 async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=8):
@@ -92,8 +93,22 @@ async def human_type(input_field, text):
 
 ANNOTATE_SCREEN_SCRIPT = """
 () => {
-    // 1. Universal screen state detection
-    const fullText = (document.body.innerText || '').toLowerCase();
+    // 1. Universal screen state detection across main document and iframes
+    const allDocs = [document];
+    try {
+        document.querySelectorAll('iframe').forEach(f => {
+            try {
+                if (f.contentDocument && f.contentDocument.body) {
+                    allDocs.push(f.contentDocument);
+                }
+            } catch(e) {}
+        });
+    } catch(e) {}
+
+    let fullText = '';
+    for (const d of allDocs) {
+        fullText += ' ' + (d.body.innerText || '').toLowerCase();
+    }
     
     // Check for termination / violation screen
     const isTerminated = (
@@ -104,14 +119,16 @@ ANNOTATE_SCREEN_SCRIPT = """
     // Check for results / finished screen
     const isResult = (
         (document.getElementById('result-screen') && !document.getElementById('result-screen').classList.contains('hidden') && window.getComputedStyle(document.getElementById('result-screen')).display !== 'none') ||
-        (fullText.includes('exam result') || fullText.includes('assessment submitted') || fullText.includes('responses have been recorded') || fullText.includes('submission accepted') || fullText.includes('test completed'))
+        (fullText.includes('exam result') || fullText.includes('assessment submitted') || fullText.includes('responses have been recorded') || fullText.includes('submission accepted') || fullText.includes('test completed') || fullText.includes('scorecard'))
     );
 
     if (isTerminated) return { state: 'terminated' };
     if (isResult) return { state: 'result' };
 
     // Strip previous agent markers
-    document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
+    for (const d of allDocs) {
+        d.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
+    }
     
     // Helper to check visibility
     const isVisible = (el) => {
@@ -123,10 +140,10 @@ ANNOTATE_SCREEN_SCRIPT = """
     };
 
     // Helper to find associated text for any input
-    const findInputText = (inp) => {
+    const findInputText = (inp, doc) => {
         // 1. Check <label for="id">
         if (inp.id) {
-            const lbl = document.querySelector(`label[for="${inp.id}"]`);
+            const lbl = doc.querySelector(`label[for="${inp.id}"]`);
             if (lbl && lbl.innerText.trim()) return lbl.innerText.trim();
         }
         // 2. Check enclosing <label>
@@ -160,77 +177,84 @@ ANNOTATE_SCREEN_SCRIPT = """
             sibling = sibling.nextSibling;
         }
 
-        // 6. Value or aria attributes
+        // 6. Value or aria attributes or image alt
+        const img = inp.parentElement ? inp.parentElement.querySelector('img') : null;
+        if (img && (img.alt || img.title)) return (img.alt || img.title).trim();
+
         return (inp.value || inp.getAttribute('aria-label') || inp.placeholder || inp.name || '').trim();
     };
 
     // 2. Extract Question Inputs ONLY (Radios, Checkboxes, Dropdowns, Text Inputs, Textareas)
     // NEVER include buttons, navigation links, or palette buttons in question options!
-    const questionInputs = Array.from(document.querySelectorAll(
-        'input[type="radio"], input[type="checkbox"], select, textarea, input[type="text"], input:not([type])'
-    ));
-
     const visibleElements = [];
     let targetCounter = 0;
 
-    for (const inp of questionInputs) {
-        if (!isVisible(inp) && inp.type !== 'radio' && inp.type !== 'checkbox') continue;
-        
-        // For radio/checkbox, even if hidden by custom css checkbox UI, parent might be visible
-        if ((inp.type === 'radio' || inp.type === 'checkbox') && !isVisible(inp)) {
-            const parent = inp.closest('label, tr, .option, .answer, .form-check, div');
-            if (!parent || !isVisible(parent)) continue;
+    for (const doc of allDocs) {
+        const questionInputs = Array.from(doc.querySelectorAll(
+            'input[type="radio"], input[type="checkbox"], select, textarea, input[type="text"], input:not([type])'
+        ));
+
+        for (const inp of questionInputs) {
+            if (!isVisible(inp) && inp.type !== 'radio' && inp.type !== 'checkbox') continue;
+            
+            // For radio/checkbox, even if hidden by custom css checkbox UI, parent might be visible
+            if ((inp.type === 'radio' || inp.type === 'checkbox') && !isVisible(inp)) {
+                const parent = inp.closest('label, tr, .option, .answer, .form-check, div');
+                if (!parent || !isVisible(parent)) continue;
+            }
+
+            inp.setAttribute('data-agent-target', String(targetCounter));
+            
+            let textContent = findInputText(inp, doc);
+            textContent = textContent.replace(/\\s+/g, ' ').substring(0, 180);
+
+            let optionsList = [];
+            if (inp.tagName === 'SELECT') {
+                optionsList = Array.from(inp.options).map(o => (o.text || o.value || '').trim()).filter(Boolean);
+            }
+
+            visibleElements.push({
+                index: targetCounter,
+                tag: inp.tagName.toLowerCase(),
+                type: inp.type || (inp.tagName === 'SELECT' ? 'select' : 'textarea'),
+                name: inp.getAttribute('name') || '',
+                value: inp.value || '',
+                text: textContent,
+                options: optionsList,
+                is_checked: inp.checked === true
+            });
+
+            targetCounter++;
         }
-
-        inp.setAttribute('data-agent-target', String(targetCounter));
-        
-        let textContent = findInputText(inp);
-        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 160);
-
-        let optionsList = [];
-        if (inp.tagName === 'SELECT') {
-            optionsList = Array.from(inp.options).map(o => (o.text || o.value || '').trim()).filter(Boolean);
-        }
-
-        visibleElements.push({
-            index: targetCounter,
-            tag: inp.tagName.toLowerCase(),
-            type: inp.type || (inp.tagName === 'SELECT' ? 'select' : 'textarea'),
-            name: inp.getAttribute('name') || '',
-            value: inp.value || '',
-            text: textContent,
-            options: optionsList,
-            is_checked: inp.checked === true
-        });
-
-        targetCounter++;
     }
 
     // Check if on start/landing page
-    if (visibleElements.length === 0 && fullText.match(/(?:start|begin|take|launch|instructions)/i)) {
+    if (visibleElements.length === 0 && fullText.match(/(?:start|begin|take|launch|instructions|general guidelines)/i)) {
         return { state: 'standby' };
     }
 
     // 3. Extract active question context
-    const questionContainers = Array.from(document.querySelectorAll(
-        '#tblQuestion, #pnlQuestion, .card, article, fieldset, [role="group"], form, main, #question-card-viewport, .question-container, .question-body, .exam-question, table'
-    ));
     let bestContainerText = '';
-    for (const c of questionContainers) {
-        if (isVisible(c)) {
-            const txt = (c.innerText || '').trim();
-            if (txt.length > 25 && (!bestContainerText || txt.length < bestContainerText.length)) {
-                bestContainerText = txt;
+    for (const doc of allDocs) {
+        const questionContainers = Array.from(doc.querySelectorAll(
+            '#tblQuestion, #pnlQuestion, .card, article, fieldset, [role="group"], form, main, #question-card-viewport, .question-container, .question-body, .exam-question, table'
+        ));
+        for (const c of questionContainers) {
+            if (isVisible(c)) {
+                const txt = (c.innerText || '').trim();
+                if (txt.length > 25 && (!bestContainerText || txt.length < bestContainerText.length)) {
+                    bestContainerText = txt;
+                }
             }
         }
     }
-    const questionContext = bestContainerText || (document.body.innerText || '').substring(0, 4000);
+    const questionContext = bestContainerText || fullText.substring(0, 4000);
     
     // 4. Dynamic Question Numbering
     let currentQNum = 0;
     let totalQCount = 0;
     const qMatch = questionContext.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i) ||
-                   (document.body.innerText || '').match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i);
+                   fullText.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i);
     if (qMatch) {
         currentQNum = parseInt(qMatch[1], 10);
         totalQCount = parseInt(qMatch[2], 10);
