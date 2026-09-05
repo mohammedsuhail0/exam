@@ -48,7 +48,7 @@ CANDIDATE_MODELS = [
     "llama-3.3-70b-versatile"
 ]
 
-async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=10):
+async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=8):
     """Generates physical cubic Bezier curves with micro-tremors to mimic human hand motor dynamics."""
     try:
         for i in range(1, steps + 1):
@@ -58,43 +58,29 @@ async def human_mouse_move(page, from_x, from_y, to_x, to_y, steps=10):
             cx = from_x + (to_x - from_x) * t_curved
             cy = from_y + (to_y - from_y) * t_curved
             
-            arc = math.sin(t * math.pi) * 5.0 * (random.random() - 0.5)
-            noise_x = random.uniform(-0.3, 0.3)
-            noise_y = random.uniform(-0.3, 0.3)
+            arc = math.sin(t * math.pi) * 4.0 * (random.random() - 0.5)
+            noise_x = random.uniform(-0.2, 0.2)
+            noise_y = random.uniform(-0.2, 0.2)
             
             await page.mouse.move(cx + arc + noise_x, cy + arc + noise_y)
-            await asyncio.sleep(random.uniform(0.008, 0.016))
+            await asyncio.sleep(random.uniform(0.006, 0.014))
         
         await page.mouse.move(to_x, to_y)
     except Exception:
         pass
 
 async def human_type(input_field, text):
-    """Types text with natural human variance, capitalization pauses, and occasional auto-corrected typos."""
+    """Types text with natural human variance and keystroke timing."""
     try:
         await input_field.focus()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.08)
         
         for char in text:
-            # 2% realistic typo auto-correction
-            if char.isalnum() and random.random() < 0.02:
-                typos = {
-                    'a': 's', 's': 'd', 'd': 'f', 'f': 'g', 'g': 'h', 'h': 'j', 'j': 'k', 'k': 'l',
-                    'q': 'w', 'w': 'e', 'e': 'r', 'r': 't', 't': 'y', 'y': 'u', 'u': 'i', 'i': 'o', 'o': 'p',
-                    'z': 'x', 'x': 'c', 'c': 'v', 'v': 'b', 'b': 'n', 'n': 'm'
-                }
-                typo_char = typos.get(char.lower(), char)
-                await input_field.press(typo_char)
-                await asyncio.sleep(random.uniform(0.06, 0.12))
-                await asyncio.sleep(random.uniform(0.12, 0.18))
-                await input_field.press("Backspace")
-                await asyncio.sleep(random.uniform(0.06, 0.12))
-                
-            delay = random.uniform(0.04, 0.09)
-            if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?':
-                delay += random.uniform(0.06, 0.12)
+            delay = random.uniform(0.03, 0.08)
+            if char.isupper() or char in '!@#$%^&*()_+{}|:\"<>?':
+                delay += random.uniform(0.04, 0.08)
             if char in " ,.?!;":
-                delay += random.uniform(0.08, 0.16)
+                delay += random.uniform(0.05, 0.10)
                 
             await input_field.press(char)
             await asyncio.sleep(delay)
@@ -118,7 +104,7 @@ ANNOTATE_SCREEN_SCRIPT = """
     // Check for results / finished screen
     const isResult = (
         (document.getElementById('result-screen') && !document.getElementById('result-screen').classList.contains('hidden') && window.getComputedStyle(document.getElementById('result-screen')).display !== 'none') ||
-        (fullText.includes('exam result') || fullText.includes('assessment submitted') || fullText.includes('responses have been recorded') || fullText.includes('submission accepted'))
+        (fullText.includes('exam result') || fullText.includes('assessment submitted') || fullText.includes('responses have been recorded') || fullText.includes('submission accepted') || fullText.includes('test completed'))
     );
 
     if (isTerminated) return { state: 'terminated' };
@@ -127,92 +113,123 @@ ANNOTATE_SCREEN_SCRIPT = """
     // Strip previous agent markers
     document.querySelectorAll('[data-agent-target]').forEach(el => el.removeAttribute('data-agent-target'));
     
-    // 2. Universal interactive candidates
-    const rawCandidates = Array.from(document.querySelectorAll(
-        'button, label, select, input:not([type="hidden"]), textarea, [role="button"], [role="checkbox"], [role="radio"], [role="option"], [contenteditable="true"]'
-    ));
-    
-    const filtered = rawCandidates.filter(el => {
-        if (el.tagName === 'INPUT' && (el.type === 'radio' || el.type === 'checkbox') && el.closest('label')) {
-            return false;
+    // Helper to check visibility
+    const isVisible = (el) => {
+        if (!el) return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || el.classList.contains('hidden')) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    };
+
+    // Helper to find associated text for any input
+    const findInputText = (inp) => {
+        // 1. Check <label for="id">
+        if (inp.id) {
+            const lbl = document.querySelector(`label[for="${inp.id}"]`);
+            if (lbl && lbl.innerText.trim()) return lbl.innerText.trim();
         }
-        return true;
-    });
-    
+        // 2. Check enclosing <label>
+        const parentLabel = inp.closest('label');
+        if (parentLabel && parentLabel.innerText.trim()) return parentLabel.innerText.trim();
+        
+        // 3. Check enclosing table row <tr>
+        const tr = inp.closest('tr');
+        if (tr) {
+            const cells = Array.from(tr.querySelectorAll('td, th'));
+            const cellTexts = cells.map(c => (c.innerText || '').trim()).filter(t => t.length > 0 && t !== inp.value);
+            if (cellTexts.length > 0) return cellTexts.join(' ');
+        }
+
+        // 4. Check enclosing container (.option, .answer, li, .form-check, div, p)
+        const container = inp.closest('.option, .answer, .form-check, .custom-control, .radio, li, p, dd');
+        if (container) {
+            const txt = (container.innerText || '').trim();
+            if (txt.length > 0) return txt;
+        }
+
+        // 5. Check next sibling text
+        let sibling = inp.nextSibling;
+        while (sibling) {
+            if (sibling.nodeType === Node.TEXT_NODE && sibling.textContent.trim()) {
+                return sibling.textContent.trim();
+            }
+            if (sibling.nodeType === Node.ELEMENT_NODE && sibling.innerText && sibling.innerText.trim()) {
+                return sibling.innerText.trim();
+            }
+            sibling = sibling.nextSibling;
+        }
+
+        // 6. Value or aria attributes
+        return (inp.value || inp.getAttribute('aria-label') || inp.placeholder || inp.name || '').trim();
+    };
+
+    // 2. Extract Question Inputs (Radios, Checkboxes, Dropdowns, Text Inputs, Textareas)
+    const questionInputs = Array.from(document.querySelectorAll(
+        'input[type="radio"], input[type="checkbox"], select, textarea, input[type="text"], input:not([type])'
+    ));
+
     const visibleElements = [];
     let targetCounter = 0;
-    
-    for (const el of filtered) {
-        const rect = el.getBoundingClientRect();
-        const style = window.getComputedStyle(el);
+
+    for (const inp of questionInputs) {
+        if (!isVisible(inp) && inp.type !== 'radio' && inp.type !== 'checkbox') continue;
         
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || el.classList.contains('hidden')) {
-            continue;
+        // For radio/checkbox, even if hidden by custom css checkbox UI, parent might be visible
+        if ((inp.type === 'radio' || inp.type === 'checkbox') && !isVisible(inp)) {
+            const parent = inp.closest('label, tr, .option, .answer, .form-check, div');
+            if (!parent || !isVisible(parent)) continue;
         }
-        if (rect.width <= 0 || rect.height <= 0) {
-            continue;
-        }
+
+        inp.setAttribute('data-agent-target', String(targetCounter));
         
-        const isPalette = el.classList.contains('palette-item') || el.classList.contains('palette-grid');
-        
-        el.setAttribute('data-agent-target', String(targetCounter));
-        
-        let textContent = (el.innerText || el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim();
-        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 140);
-        
+        let textContent = findInputText(inp);
+        textContent = textContent.replace(/\\s+/g, ' ').substring(0, 160);
+
         let optionsList = [];
-        if (el.tagName === 'SELECT') {
-            optionsList = Array.from(el.options).map(o => o.text.trim()).filter(Boolean);
+        if (inp.tagName === 'SELECT') {
+            optionsList = Array.from(inp.options).map(o => (o.text || o.value || '').trim()).filter(Boolean);
         }
-        
-        let resolvedType = el.getAttribute('type') || '';
-        if (!resolvedType && el.tagName === 'LABEL') {
-            const inner = el.querySelector('input');
-            if (inner) resolvedType = inner.type || '';
-        }
-        
+
         visibleElements.push({
             index: targetCounter,
-            tag: el.tagName.toLowerCase(),
-            type: resolvedType,
-            name: el.getAttribute('name') || '',
+            tag: inp.tagName.toLowerCase(),
+            type: inp.type || (inp.tagName === 'SELECT' ? 'select' : 'textarea'),
+            name: inp.getAttribute('name') || '',
+            value: inp.value || '',
             text: textContent,
             options: optionsList,
-            is_palette_btn: isPalette
+            is_checked: inp.checked === true
         });
-        
+
         targetCounter++;
     }
-    
-    // Check if landing / start page
-    const questionInputs = visibleElements.filter(e => 
-        e.tag === 'select' || e.tag === 'textarea' || 
-        (e.tag === 'input' && e.type !== 'submit' && e.type !== 'button') || 
-        (e.tag === 'label' && (e.type === 'radio' || e.type === 'checkbox'))
-    );
-    
-    if (questionInputs.length === 0 && visibleElements.some(e => /start|begin|take|launch/i.test(e.text))) {
+
+    // Check if on start/landing page
+    if (visibleElements.length === 0 && fullText.match(/(?:start|begin|take|launch|instructions)/i)) {
         return { state: 'standby' };
     }
 
     // 3. Extract active question context
-    const questionContainers = Array.from(document.querySelectorAll('.card, article, fieldset, [role="group"], form, main, #question-card-viewport'));
+    const questionContainers = Array.from(document.querySelectorAll(
+        '#tblQuestion, #pnlQuestion, .card, article, fieldset, [role="group"], form, main, #question-card-viewport, .question-container, .question-body, .exam-question, table'
+    ));
     let bestContainerText = '';
     for (const c of questionContainers) {
-        if (window.getComputedStyle(c).display !== 'none') {
+        if (isVisible(c)) {
             const txt = (c.innerText || '').trim();
-            if (txt.length > 20 && (!bestContainerText || txt.length < bestContainerText.length)) {
+            if (txt.length > 25 && (!bestContainerText || txt.length < bestContainerText.length)) {
                 bestContainerText = txt;
             }
         }
     }
     const questionContext = bestContainerText || (document.body.innerText || '').substring(0, 4000);
     
-    // 4. Extract question numbering dynamically (regex matches Question X of Y on any platform)
+    // 4. Dynamic Question Numbering
     let currentQNum = 0;
     let totalQCount = 0;
-    const qMatch = questionContext.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-)\\s*(\\d+)/i) ||
-                   (document.body.innerText || '').match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-)\\s*(\\d+)/i);
+    const qMatch = questionContext.match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i) ||
+                   (document.body.innerText || '').match(/(?:question|problem|q\\.?|item)\\s*(\\d+)\\s*(?:of|\\/|\\-|\\:)\\s*(\\d+)/i);
     if (qMatch) {
         currentQNum = parseInt(qMatch[1], 10);
         totalQCount = parseInt(qMatch[2], 10);
@@ -229,72 +246,83 @@ ANNOTATE_SCREEN_SCRIPT = """
 """
 
 async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
-    """Executes a resilient click ensuring the element is activated and UI visually updates immediately."""
+    """Resilient universal option selector supporting any HTML table, div, or custom portal UI."""
     try:
+        # Step 1: Scroll element into center view
+        await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", element)
+        await asyncio.sleep(0.08)
+
+        # Step 2: Full DOM state mutation + event cascades on the input and all surrounding wrappers
+        await page.evaluate("""(el) => {
+            if (!el) return;
+            
+            // Set input state directly
+            if (el.tagName === 'INPUT') {
+                if (el.type === 'radio') {
+                    el.checked = true;
+                } else if (el.type === 'checkbox') {
+                    el.checked = !el.checked;
+                }
+            }
+            
+            // Native element activation
+            try { el.focus(); } catch(e) {}
+            try { el.click(); } catch(e) {}
+            
+            // Event cascade for React / Vue / Angular / jQuery / Native HTML forms
+            const evList = ['mousedown', 'mouseup', 'click', 'input', 'change'];
+            for (const evName of evList) {
+                try {
+                    el.dispatchEvent(new Event(evName, { bubbles: true, cancelable: true }));
+                } catch(e) {}
+            }
+
+            // Also click associated <label for="...">
+            if (el.id) {
+                const lbl = document.querySelector(`label[for="${el.id}"]`);
+                if (lbl && lbl !== el) {
+                    try { lbl.click(); } catch(e) {}
+                }
+            }
+            const parentLabel = el.closest('label');
+            if (parentLabel && parentLabel !== el) {
+                try { parentLabel.click(); } catch(e) {}
+            }
+
+            // Also click parent container row (tr, li, .option, .answer, .form-check)
+            const row = el.closest('tr, li, .option, .answer, .form-check, .custom-control, .option-label');
+            if (row && row !== el) {
+                try { row.click(); } catch(e) {}
+                row.classList.add('active-selected');
+            }
+        }""", element)
+
+        # Step 3: Natural mouse move & physical CDP click
         box = await element.bounding_box()
+        if not box or box['width'] <= 0 or box['height'] <= 0:
+            # If input is tiny/hidden by custom CSS, find bounding box of parent label/row
+            parent = await element.query_selector("xpath=..")
+            if parent:
+                box = await parent.bounding_box()
+
         if box and box['width'] > 0 and box['height'] > 0:
             tx = box['x'] + box['width'] / 2
             ty = box['y'] + box['height'] / 2
             await human_mouse_move(page, from_x, from_y, tx, ty)
             await page.mouse.click(tx, ty)
-            
-            # Universal UI activation guarantee: Ensure input & radio/checkbox visual state updates immediately
-            await page.evaluate("""(el) => {
-                if (!el) return;
-                const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
-                if (inp) {
-                    if (inp.type === 'radio') {
-                        inp.checked = true;
-                    } else if (inp.type === 'checkbox') {
-                        inp.checked = !inp.checked;
-                    }
-                    inp.dispatchEvent(new Event('input', { bubbles: true }));
-                    inp.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                const label = el.closest('label') || (el.classList && el.classList.contains('option-label') ? el : null);
-                if (label) {
-                    const parentCard = label.closest('.card, .question-controls, body');
-                    if (parentCard && inp && inp.type === 'radio') {
-                        parentCard.querySelectorAll('.option-label').forEach(l => l.classList.remove('active-selected'));
-                    }
-                    label.classList.add('active-selected');
-                }
-            }""", element)
-            
-            return True, tx, ty
-    except Exception:
-        pass
+            from_x, from_y = tx, ty
 
-    try:
-        await element.click(force=True, timeout=800)
-        await page.evaluate("""(el) => {
-            if (!el) return;
-            const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
-            if (inp) {
-                if (inp.type === 'radio') inp.checked = true;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            const label = el.closest('label') || (el.classList && el.classList.contains('option-label') ? el : null);
-            if (label) label.classList.add('active-selected');
-        }""", element)
-        return True, from_x, from_y
-    except Exception:
-        pass
+        # Step 4: Verification - verify input is checked
+        is_checked = await page.evaluate("(el) => el.checked === true", element)
+        if not is_checked:
+            try:
+                await element.check(force=True, timeout=500)
+            except Exception:
+                try:
+                    await element.click(force=True, timeout=500)
+                except Exception:
+                    pass
 
-    try:
-        await page.evaluate("""(el) => {
-            el.focus();
-            el.click();
-            const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
-            if (inp) {
-                if (inp.type === 'radio') inp.checked = true;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            const label = el.closest('label') || (el.classList && el.classList.contains('option-label') ? el : null);
-            if (label) label.classList.add('active-selected');
-        }""", element)
         return True, from_x, from_y
     except Exception:
         pass
@@ -302,7 +330,7 @@ async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
     return False, from_x, from_y
 
 async def robust_select_dropdown(element, opt_val):
-    """4-tier resilient dropdown option selector."""
+    """Resilient dropdown option selector."""
     opt_val_str = str(opt_val).strip()
     
     try:
@@ -337,32 +365,52 @@ async def robust_select_dropdown(element, opt_val):
     return False
 
 async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
-    """Guaranteed Next Button activator that moves the mouse naturally and advances to the next question."""
+    """Universal Next/Save Button finder that works on ASP.NET, PHP, Moodle, and all exam portals."""
     try:
-        has_next = await page.evaluate("""() => {
-            const isVisible = (b) => b && !b.classList.contains('hidden') && b.offsetParent !== null && window.getComputedStyle(b).display !== 'none' && !b.disabled;
-            
-            const nextBtn = document.getElementById('next-btn');
-            if (nextBtn && isVisible(nextBtn)) {
-                nextBtn.click();
-                return true;
+        btn_info = await page.evaluate("""() => {
+            const isVisible = (b) => {
+                if (!b || b.disabled || b.classList.contains('hidden')) return false;
+                const style = window.getComputedStyle(b);
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                const r = b.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            };
+
+            const candidates = Array.from(document.querySelectorAll(
+                'button, input[type="submit"], input[type="button"], input[type="image"], a, [role="button"], span.btn, div.btn'
+            ));
+
+            // Priority 1: Exact Next / Save & Next matches
+            for (const b of candidates) {
+                if (!isVisible(b)) continue;
+                const text = (b.innerText || b.value || b.getAttribute('title') || b.getAttribute('alt') || b.name || b.id || '').toLowerCase().trim();
+                
+                // Exclude final test submission buttons
+                if (text.includes('finalize') || text.includes('finish exam') || text.includes('end exam') || text.includes('end test') || text.includes('submit exam') || text.includes('submit test')) {
+                    if (!text.includes('next') && !text.includes('save & next') && !text.includes('save and next')) {
+                        continue;
+                    }
+                }
+
+                if (text.includes('save & next') || text.includes('save and next') || text.includes('save & continue') || 
+                    text.includes('next question') || text.includes('next >') || text.includes('next') || 
+                    text === 'save' || text.includes('btnnext') || text === 'forward' || text === 'continue' || text === 'proceed') {
+                    
+                    b.focus();
+                    b.click();
+                    try { b.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
+                    return { clicked: true, text: text };
+                }
             }
-            
-            const altBtn = Array.from(document.querySelectorAll('button, a.btn, [role="button"]')).find(b => {
-                if (!isVisible(b)) return false;
-                const t = (b.innerText || b.value || '').toLowerCase().trim();
-                return (t.includes('next') || t.includes('continue') || t.includes('proceed') || t.includes('save') || t.includes('forward')) && 
-                       !t.includes('finalize') && !t.includes('submit') && !t.includes('finish') && !t.includes('reload');
-            });
-            if (altBtn) {
-                altBtn.click();
-                return true;
-            }
-            return false;
+
+            return { clicked: false };
         }""")
 
-        if has_next:
-            next_el = await page.query_selector("#next-btn:not(.hidden), button:has-text('Next'):not(.hidden), button:has-text('Save & Next'):not(.hidden)")
+        if btn_info and btn_info.get('clicked'):
+            # Also simulate natural mouse movement to next button area
+            next_el = await page.query_selector(
+                "input[type='submit'][value*='Next' i], input[type='button'][value*='Next' i], input[type='submit'][value*='Save' i], button:has-text('Next'), button:has-text('Save & Next'), #next-btn, #btnNext"
+            )
             if next_el and await next_el.is_visible():
                 box = await next_el.bounding_box()
                 if box:
@@ -370,14 +418,14 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
                     ty = box['y'] + box['height'] / 2
                     await human_mouse_move(page, cur_x, cur_y, tx, ty)
                     cur_x, cur_y = tx, ty
-            
+
             return True, cur_x, cur_y
     except Exception:
         pass
     return False, cur_x, cur_y
 
 def parse_llm_json(raw_text):
-    """Robust JSON parser that extracts JSON even with markdown wrappers."""
+    """Extracts valid JSON from raw LLM output even with markdown or extra text."""
     clean = raw_text.strip()
     try:
         return json.loads(clean)
@@ -394,8 +442,8 @@ def parse_llm_json(raw_text):
 
 async def universal_destruction_engine():
     print("=" * 68)
-    print("🧠 SYSTEM ACTIVE: AUTONOMOUS SCREEN-AWARE UNIVERSAL TEST AGENT")
-    print("🎯 Dynamic Solver Engine: Supports ANY Question Count (25, 50, 100+)")
+    print("🧠 SYSTEM ACTIVE: AUTONOMOUS UNIVERSAL EXAM SOLVER")
+    print("🎯 Dynamic Solver Engine: Universally Supports ANY Portal & Question Count")
     print("=" * 68)
     
     for i in range(3, 0, -1):
@@ -427,18 +475,17 @@ async def universal_destruction_engine():
                 
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
-            # Unbounded dynamic loop runway (supports tests with up to 500 questions)
             MAX_SCREEN_CYCLES = 500
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
-                # 1. Inspect screen state
+                # 1. Inspect active screen state
                 screen_state = await page.evaluate(ANNOTATE_SCREEN_SCRIPT)
                 current_state = screen_state.get('state', 'exam')
                 
                 # Check for termination
                 if current_state == 'terminated':
                     print("\n" + "=" * 68)
-                    print("🛑 [SESSION TERMINATED] Assessment stopped by security/proctoring policy.")
+                    print("🛑 [SESSION TERMINATED] Assessment stopped by security policy.")
                     print("🛡️  Autonomous agent halting execution immediately.")
                     print("=" * 68)
                     return
@@ -463,7 +510,7 @@ async def universal_destruction_engine():
 
                 if not elements:
                     print("[!] Waiting for active question elements in viewport...")
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.6)
                     continue
 
                 print(f"\n--- [{header_label}] ---")
@@ -471,32 +518,26 @@ async def universal_destruction_engine():
                 # Natural human reading pause before answering
                 await asyncio.sleep(random.uniform(0.6, 1.2))
 
-                # Filter question options
-                question_options = [e for e in elements if not e.get('is_palette_btn') and not any(
-                    n in e.get('text', '').lower() for n in ['next', 'previous', 'submit', 'finalize', 'save & next', 'reload']
-                )]
+                # Question targets
+                question_options = elements
 
                 system_prompt = (
-                    "You are a master academic solver.\n"
-                    "All interactive elements have a `[data-agent-target=\"<index>\"]` integer index.\n\n"
-                    "INSTRUCTIONS:\n"
-                    "1. Read the active question and identify the correct answer(s).\n"
-                    "2. Return the action needed to answer the question:\n"
-                    "   - For radio/checkbox: {\"type\": \"click\", \"target_index\": <idx>, \"reason\": \"...\"}\n"
-                    "   - For dropdown select: {\"type\": \"select\", \"target_index\": <idx>, \"option_text\": \"...\", \"reason\": \"...\"}\n"
-                    "   - For text/textarea: {\"type\": \"type\", \"target_index\": <idx>, \"text\": \"...\", \"reason\": \"...\"}\n\n"
+                    "You are a master academic examination solver.\n"
+                    "Read the active question context and examine the available input targets.\n"
+                    "Select the single best correct option or provide text for the input.\n\n"
                     "Output strictly in this JSON format:\n"
                     "{\n"
-                    "  \"question_summary\": \"Question topic and answer\",\n"
-                    "  \"actions\": [\n"
-                    "    {\"type\": \"click\", \"target_index\": 25, \"reason\": \"Select correct option\"}\n"
-                    "  ]\n"
+                    "  \"question_summary\": \"Brief explanation of question and correct answer\",\n"
+                    "  \"selected_target_index\": 0,\n"
+                    "  \"selected_option_text\": \"Exact text of the correct option\",\n"
+                    "  \"text_to_type\": \"(only for text inputs/textareas)\",\n"
+                    "  \"reason\": \"Why this is the correct answer\"\n"
                     "}"
                 )
                 
                 user_content = (
                     f"--- ACTIVE QUESTION CONTENT ---\n{q_context}\n\n"
-                    f"--- INTERACTIVE QUESTION TARGETS ---\n{json.dumps(question_options, indent=2)}"
+                    f"--- AVAILABLE QUESTION INPUT TARGETS ---\n{json.dumps(question_options, indent=2)}"
                 )
 
                 plan = None
@@ -512,68 +553,70 @@ async def universal_destruction_engine():
                         )
                         raw_content = resp.choices[0].message.content
                         plan = parse_llm_json(raw_content)
-                        if plan and plan.get("actions"):
+                        if plan and (plan.get("selected_target_index") is not None or plan.get("actions") or plan.get("selected_option_text")):
                             break
                     except Exception:
                         continue
 
-                actions = plan.get("actions", []) if plan else []
+                # Fallback matching if target index is ambiguous
+                target_idx = None
+                if plan:
+                    if plan.get("selected_target_index") is not None:
+                        target_idx = plan.get("selected_target_index")
+                    elif plan.get("actions") and len(plan["actions"]) > 0:
+                        target_idx = plan["actions"][0].get("target_index")
                 
-                if not actions and question_options:
-                    first_opt = question_options[0]
-                    actions.append({
-                        "type": "select" if first_opt.get('tag') == 'select' else "click",
-                        "target_index": first_opt.get('index'),
-                        "option_text": first_opt.get('options', [''])[0] if first_opt.get('options') else '',
-                        "reason": "Self-healing option selection"
-                    })
+                # Fuzzy keyword matching fallback
+                if target_idx is None or not any(e.get("index") == target_idx for e in question_options):
+                    opt_search_text = (plan.get("selected_option_text", "") or plan.get("question_summary", "") or plan.get("reason", "")).lower()
+                    matched_elem = None
+                    for opt in question_options:
+                        o_txt = opt.get("text", "").lower()
+                        o_val = opt.get("value", "").lower()
+                        if opt_search_text and (opt_search_text in o_txt or o_txt in opt_search_text or (len(o_val) > 0 and o_val == opt_search_text)):
+                            matched_elem = opt
+                            break
+                    
+                    if matched_elem:
+                        target_idx = matched_elem.get("index")
+                    elif question_options:
+                        # Safety fallback: always answer first option
+                        target_idx = question_options[0].get("index")
 
-                print(f"💡 AI Analysis: {plan.get('question_summary', 'Solving question...') if plan else 'Self-healing mode active'}")
+                summary_text = plan.get("question_summary", "Solving question...") if plan else "Autonomous solver analysis"
+                print(f"💡 AI Analysis: {summary_text}")
 
-                # 1. Execute answer actions
-                for act_idx, action in enumerate(actions):
-                    try:
-                        act_type = action.get("type", "click")
-                        t_idx = str(action.get("target_index", ""))
-                        reason = action.get("reason", "")
+                # Execute answer action
+                target_el = await page.query_selector(f'[data-agent-target="{target_idx}"]')
+                matched_target_info = next((e for e in question_options if e.get("index") == target_idx), {})
+                
+                if target_el:
+                    tag_type = matched_target_info.get("type", "radio")
+                    
+                    if tag_type in ["radio", "checkbox"] or matched_target_info.get("tag") == "input":
+                        _, current_mouse_x, current_mouse_y = await robust_click_element(
+                            page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
+                        )
+                        print(f"    [+] Selected Option [{target_idx}] -> {matched_target_info.get('text', '')}")
                         
-                        if not t_idx:
-                            continue
-                            
-                        target_el = await page.query_selector(f'[data-agent-target="{t_idx}"]')
-                        if not target_el:
-                            continue
-                            
-                        el_text = (await page.evaluate("(el) => (el.innerText || el.value || '').toLowerCase()", target_el)).strip()
-                        if any(x in el_text for x in ["finalize submission", "submit exam", "submit test", "end test", "finish exam", "reload"]):
-                            continue
-
-                        await page.evaluate("(el) => el.scrollIntoView({behavior: 'smooth', block: 'center'})", target_el)
+                    elif tag_type in ["text", "textarea"]:
+                        _, current_mouse_x, current_mouse_y = await robust_click_element(
+                            page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
+                        )
                         await asyncio.sleep(0.08)
+                        val = str(plan.get("text_to_type", plan.get("selected_option_text", ""))) if plan else ""
+                        await human_type(target_el, val)
+                        print(f"    [+] Typed '{val}' into [{target_idx}]")
                         
-                        if act_type == "click":
-                            _, current_mouse_x, current_mouse_y = await robust_click_element(
-                                page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
-                            )
-                            print(f"    [+] Selected [{t_idx}] -> {reason}")
-                                
-                        elif act_type == "type":
-                            _, current_mouse_x, current_mouse_y = await robust_click_element(
-                                page, target_el, from_x=current_mouse_x, from_y=current_mouse_y
-                            )
-                            await asyncio.sleep(0.08)
-                            val = str(action.get("text", ""))
-                            await human_type(target_el, val)
-                            print(f"    [+] Typed '{val}' into [{t_idx}] -> {reason}")
-                            
-                        elif act_type == "select":
-                            opt_val = str(action.get("option_text", action.get("text", action.get("value", ""))))
-                            await robust_select_dropdown(target_el, opt_val)
-                            print(f"    [+] Selected dropdown option '{opt_val}' on [{t_idx}] -> {reason}")
+                    elif tag_type == "select" or matched_target_info.get("tag") == "select":
+                        opt_val = str(plan.get("selected_option_text", "")) if plan else ""
+                        await robust_select_dropdown(target_el, opt_val)
+                        print(f"    [+] Selected dropdown option '{opt_val}' on [{target_idx}]")
 
-                        await asyncio.sleep(random.uniform(0.2, 0.4))
-                    except Exception:
-                        continue
+                await asyncio.sleep(random.uniform(0.3, 0.5))
+
+                # Snapshot old context before advancing
+                old_context_snippet = (q_context or '')[:80]
 
                 # 2. Advance to the next question
                 nav_success, current_mouse_x, current_mouse_y = await trigger_next_button(
@@ -582,12 +625,18 @@ async def universal_destruction_engine():
 
                 if nav_success:
                     print(f"    [⏩ ADVANCING] Navigating to next assessment item...")
-                    # Wait for next question to render
-                    for _ in range(12):
-                        new_q = await page.evaluate("() => parseInt(document.getElementById('current-q-num')?.innerText || '0', 10)")
-                        if current_q_num and new_q > current_q_num:
+                    
+                    # Resilient wait for page transition / next question render
+                    for _ in range(18):
+                        await asyncio.sleep(0.15)
+                        try:
+                            new_context = await page.evaluate("() => (document.body.innerText || '').substring(0, 80)")
+                            if new_context != old_context_snippet:
+                                break
+                        except Exception:
+                            # Page is reloading / navigating
+                            await asyncio.sleep(0.5)
                             break
-                        await asyncio.sleep(0.1)
                 else:
                     # Final question reached (No next button exists, submit button is active)
                     print("\n" + "=" * 68)
