@@ -180,6 +180,34 @@
       </article>
     `;
 
+    // Sync active selection state
+    const updateSelectionUI = () => {
+      saveCurrentInput();
+      renderPalette();
+      el.questionViewport.querySelectorAll(".option-label").forEach(lbl => {
+        const inp = lbl.querySelector("input");
+        if (inp && inp.checked) {
+          lbl.classList.add("active-selected");
+        } else {
+          lbl.classList.remove("active-selected");
+        }
+      });
+    };
+
+    el.questionViewport.querySelectorAll(".option-label").forEach(lbl => {
+      const inp = lbl.querySelector("input");
+      if (inp && inp.checked) {
+        lbl.classList.add("active-selected");
+      }
+      lbl.addEventListener("click", () => {
+        setTimeout(updateSelectionUI, 10);
+      });
+      if (inp) {
+        inp.addEventListener("change", updateSelectionUI);
+        inp.addEventListener("input", updateSelectionUI);
+      }
+    });
+
     renderPalette();
     bindInputCadenceMonitors();
   }

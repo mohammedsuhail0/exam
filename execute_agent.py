@@ -229,7 +229,7 @@ ANNOTATE_SCREEN_SCRIPT = """
 """
 
 async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
-    """Executes a 3-tier fallback click ensuring the element is activated regardless of styling."""
+    """Executes a resilient click ensuring the element is activated and UI visually updates immediately."""
     try:
         box = await element.bounding_box()
         if box and box['width'] > 0 and box['height'] > 0:
@@ -237,18 +237,64 @@ async def robust_click_element(page, element, from_x=250.0, from_y=250.0):
             ty = box['y'] + box['height'] / 2
             await human_mouse_move(page, from_x, from_y, tx, ty)
             await page.mouse.click(tx, ty)
+            
+            # Universal UI activation guarantee: Ensure input & radio/checkbox visual state updates immediately
+            await page.evaluate("""(el) => {
+                if (!el) return;
+                const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
+                if (inp) {
+                    if (inp.type === 'radio') {
+                        inp.checked = true;
+                    } else if (inp.type === 'checkbox') {
+                        inp.checked = !inp.checked;
+                    }
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                const label = el.closest('label') || (el.classList && el.classList.contains('option-label') ? el : null);
+                if (label) {
+                    const parentCard = label.closest('.card, .question-controls, body');
+                    if (parentCard && inp && inp.type === 'radio') {
+                        parentCard.querySelectorAll('.option-label').forEach(l => l.classList.remove('active-selected'));
+                    }
+                    label.classList.add('active-selected');
+                }
+            }""", element)
+            
             return True, tx, ty
     except Exception:
         pass
 
     try:
         await element.click(force=True, timeout=800)
+        await page.evaluate("""(el) => {
+            if (!el) return;
+            const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
+            if (inp) {
+                if (inp.type === 'radio') inp.checked = true;
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            const label = el.closest('label') || (el.classList && el.classList.contains('option-label') ? el : null);
+            if (label) label.classList.add('active-selected');
+        }""", element)
         return True, from_x, from_y
     except Exception:
         pass
 
     try:
-        await page.evaluate("(el) => { el.focus(); el.click(); }", element)
+        await page.evaluate("""(el) => {
+            el.focus();
+            el.click();
+            const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
+            if (inp) {
+                if (inp.type === 'radio') inp.checked = true;
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            const label = el.closest('label') || (el.classList && el.classList.contains('option-label') ? el : null);
+            if (label) label.classList.add('active-selected');
+        }""", element)
         return True, from_x, from_y
     except Exception:
         pass
