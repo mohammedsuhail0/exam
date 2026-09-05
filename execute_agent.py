@@ -366,7 +366,7 @@ async def robust_select_dropdown(element, opt_val):
     return False
 
 async def trigger_next_button(page, cur_x=250.0, cur_y=250.0, target_q_num=0):
-    """Strict Forward Navigation: Guarantees advancing forward and NEVER clicks Previous/Back."""
+    """Strict Forward Navigation: Guarantees advancing forward (Next) and NEVER clicks Previous/Back or Final Submit."""
     try:
         btn_info = await page.evaluate("""(targetQ) => {
             const isVisible = (b) => {
@@ -381,30 +381,32 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0, target_q_num=0):
                 'button, input[type="submit"], input[type="button"], input[type="image"], a, [role="button"], span.btn, div.btn'
             ));
 
-            // STRICT REJECTION: Reject any button that moves backward or clears/resets
+            // STRICT REJECTION: Reject backward buttons and final submit buttons
             const isStrictlyForbidden = (t) => {
-                return t.includes('prev') || t.includes('back') || t.includes('clear') || 
-                       t.includes('reset') || t.includes('review') || t.includes('mark') || 
-                       t.includes('cancel') || t.includes('close') || t.includes('exit');
+                // Reject backward / reset buttons
+                if (t.includes('prev') || t.includes('back') || t.includes('clear') || 
+                    t.includes('reset') || t.includes('review') || t.includes('mark') || 
+                    t.includes('cancel') || t.includes('close') || t.includes('exit')) {
+                    return true;
+                }
+                // Reject final submission buttons unless specifically a "Save & Next"
+                if ((t.includes('submit') || t.includes('final') || t.includes('finish') || t.includes('end exam') || t.includes('end test') || t.includes('complete')) && !t.includes('next')) {
+                    return true;
+                }
+                return false;
             };
 
-            // PASS 1: Strict Save & Next / Next Question / btnNext
+            // PASS 1: Strict Next / Save & Next matches
             for (const b of candidates) {
                 if (!isVisible(b)) continue;
                 const text = (b.innerText || b.value || b.getAttribute('title') || b.getAttribute('alt') || b.name || b.id || '').toLowerCase().trim();
                 
                 if (isStrictlyForbidden(text)) continue;
 
-                // Exclude final test submission buttons
-                if (text.includes('finalize') || text.includes('finish exam') || text.includes('end exam') || text.includes('end test') || text.includes('submit exam') || text.includes('submit test')) {
-                    if (!text.includes('next') && !text.includes('save & next') && !text.includes('save and next')) {
-                        continue;
-                    }
-                }
-
-                if (text.includes('save & next') || text.includes('save and next') || text.includes('save & continue') || 
-                    text.includes('save and continue') || text.includes('next question') || text.includes('next >') || 
-                    text.includes('next >>') || text === 'next' || text.includes('btnnext') || text.includes('btnsavenext') ||
+                if (text === 'next' || text.startsWith('next') || text.includes('next >') || 
+                    text.includes('next >>') || text.includes('save & next') || text.includes('save and next') || 
+                    text.includes('save & continue') || text.includes('save and continue') || 
+                    text.includes('next question') || text.includes('btnnext') || text.includes('btnsavenext') ||
                     text.includes('forward') || text === 'save & forward') {
                     
                     b.focus();
@@ -414,7 +416,7 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0, target_q_num=0):
                 }
             }
 
-            // PASS 2: Broader forward keywords (only if strictly not backwards)
+            // PASS 2: Broader forward keywords (only if strictly not backwards or submit)
             for (const b of candidates) {
                 if (!isVisible(b)) continue;
                 const text = (b.innerText || b.value || b.getAttribute('title') || b.getAttribute('alt') || b.name || b.id || '').toLowerCase().trim();
@@ -696,7 +698,7 @@ async def universal_destruction_engine():
                     # Final question reached (No next button exists, submit button is active)
                     print("\n" + "=" * 68)
                     print("🎯 [ASSESSMENT COMPLETE] All question items in active viewport resolved!")
-                    print("🛡️  SAFETY SHIELD ACTIVE: 'Submit' button preserved for manual review.")
+                    print("🛡️  SAFETY SHIELD ACTIVE: 'Submit Final' button preserved for manual review.")
                     print("👉  Control passed to human operator for final verification.")
                     print("=" * 68)
                     break
