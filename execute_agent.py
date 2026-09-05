@@ -164,7 +164,8 @@ ANNOTATE_SCREEN_SCRIPT = """
         return (inp.value || inp.getAttribute('aria-label') || inp.placeholder || inp.name || '').trim();
     };
 
-    // 2. Extract Question Inputs (Radios, Checkboxes, Dropdowns, Text Inputs, Textareas)
+    // 2. Extract Question Inputs ONLY (Radios, Checkboxes, Dropdowns, Text Inputs, Textareas)
+    // NEVER include buttons, navigation links, or palette buttons in question options!
     const questionInputs = Array.from(document.querySelectorAll(
         'input[type="radio"], input[type="checkbox"], select, textarea, input[type="text"], input:not([type])'
     ));
@@ -364,10 +365,10 @@ async def robust_select_dropdown(element, opt_val):
 
     return False
 
-async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
-    """Universal Next/Save Button finder that works on ASP.NET, PHP, Moodle, and all exam portals."""
+async def trigger_next_button(page, cur_x=250.0, cur_y=250.0, target_q_num=0):
+    """Strict Forward Navigation: Guarantees advancing forward and NEVER clicks Previous/Back."""
     try:
-        btn_info = await page.evaluate("""() => {
+        btn_info = await page.evaluate("""(targetQ) => {
             const isVisible = (b) => {
                 if (!b || b.disabled || b.classList.contains('hidden')) return false;
                 const style = window.getComputedStyle(b);
@@ -380,11 +381,20 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
                 'button, input[type="submit"], input[type="button"], input[type="image"], a, [role="button"], span.btn, div.btn'
             ));
 
-            // Priority 1: Exact Next / Save & Next matches
+            // STRICT REJECTION: Reject any button that moves backward or clears/resets
+            const isStrictlyForbidden = (t) => {
+                return t.includes('prev') || t.includes('back') || t.includes('clear') || 
+                       t.includes('reset') || t.includes('review') || t.includes('mark') || 
+                       t.includes('cancel') || t.includes('close') || t.includes('exit');
+            };
+
+            // PASS 1: Strict Save & Next / Next Question / btnNext
             for (const b of candidates) {
                 if (!isVisible(b)) continue;
                 const text = (b.innerText || b.value || b.getAttribute('title') || b.getAttribute('alt') || b.name || b.id || '').toLowerCase().trim();
                 
+                if (isStrictlyForbidden(text)) continue;
+
                 // Exclude final test submission buttons
                 if (text.includes('finalize') || text.includes('finish exam') || text.includes('end exam') || text.includes('end test') || text.includes('submit exam') || text.includes('submit test')) {
                     if (!text.includes('next') && !text.includes('save & next') && !text.includes('save and next')) {
@@ -393,18 +403,49 @@ async def trigger_next_button(page, cur_x=250.0, cur_y=250.0):
                 }
 
                 if (text.includes('save & next') || text.includes('save and next') || text.includes('save & continue') || 
-                    text.includes('next question') || text.includes('next >') || text.includes('next') || 
-                    text === 'save' || text.includes('btnnext') || text === 'forward' || text === 'continue' || text === 'proceed') {
+                    text.includes('save and continue') || text.includes('next question') || text.includes('next >') || 
+                    text.includes('next >>') || text === 'next' || text.includes('btnnext') || text.includes('btnsavenext') ||
+                    text.includes('forward') || text === 'save & forward') {
                     
                     b.focus();
                     b.click();
                     try { b.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
-                    return { clicked: true, text: text };
+                    return { clicked: true, text: text, method: 'next_btn' };
+                }
+            }
+
+            // PASS 2: Broader forward keywords (only if strictly not backwards)
+            for (const b of candidates) {
+                if (!isVisible(b)) continue;
+                const text = (b.innerText || b.value || b.getAttribute('title') || b.getAttribute('alt') || b.name || b.id || '').toLowerCase().trim();
+                
+                if (isStrictlyForbidden(text)) continue;
+
+                if (text.includes('next') || text.includes('continue') || text.includes('proceed') || text === 'save') {
+                    b.focus();
+                    b.click();
+                    try { b.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
+                    return { clicked: true, text: text, method: 'broad_next' };
+                }
+            }
+
+            // PASS 3: Palette Jump Recovery (Click target_q_num in question palette if next button missing)
+            if (targetQ > 0) {
+                const paletteItems = Array.from(document.querySelectorAll('.palette-item, [data-qid], .q-btn, .btn-palette, .num-btn, button, a'));
+                for (const p of paletteItems) {
+                    if (!isVisible(p)) continue;
+                    const txt = (p.innerText || p.value || '').trim();
+                    if (txt === String(targetQ)) {
+                        p.focus();
+                        p.click();
+                        try { p.dispatchEvent(new Event('click', { bubbles: true })); } catch(e) {}
+                        return { clicked: true, text: 'Palette Q' + targetQ, method: 'palette' };
+                    }
                 }
             }
 
             return { clicked: false };
-        }""")
+        }""", target_q_num)
 
         if btn_info and btn_info.get('clicked'):
             # Also simulate natural mouse movement to next button area
@@ -476,6 +517,7 @@ async def universal_destruction_engine():
             print(f"[+] Hooked into active viewport: {page.url}\n")
             
             MAX_SCREEN_CYCLES = 500
+            visited_q_history = []
             
             for cycle in range(1, MAX_SCREEN_CYCLES + 1):
                 # 1. Inspect active screen state
@@ -505,6 +547,18 @@ async def universal_destruction_engine():
                 q_context = screen_state.get('question_context', '')
                 current_q_num = screen_state.get('current_q_num', 0)
                 total_q_count = screen_state.get('total_q_count', 0)
+
+                # Loop & oscillation prevention
+                if current_q_num > 0:
+                    visited_q_history.append(current_q_num)
+                    # Check if oscillating (e.g., repeating last question)
+                    if len(visited_q_history) >= 4 and visited_q_history[-1] == visited_q_history[-3] and visited_q_history[-2] == visited_q_history[-4]:
+                        print(f"[⚠️ ANTI-LOOP] Detected oscillation on Question {current_q_num}. Forcing forward progression...")
+                        max_visited = max(visited_q_history)
+                        target_next = max_visited + 1
+                        await trigger_next_button(page, current_mouse_x, current_mouse_y, target_q_num=target_next)
+                        await asyncio.sleep(1.2)
+                        continue
 
                 header_label = f"Question {current_q_num} of {total_q_count}" if (current_q_num and total_q_count) else f"Assessment Item {cycle}"
 
@@ -617,10 +671,11 @@ async def universal_destruction_engine():
 
                 # Snapshot old context before advancing
                 old_context_snippet = (q_context or '')[:80]
+                next_target_q = (current_q_num + 1) if current_q_num > 0 else 0
 
-                # 2. Advance to the next question
+                # 2. Advance strictly to the next question
                 nav_success, current_mouse_x, current_mouse_y = await trigger_next_button(
-                    page, current_mouse_x, current_mouse_y
+                    page, current_mouse_x, current_mouse_y, target_q_num=next_target_q
                 )
 
                 if nav_success:
