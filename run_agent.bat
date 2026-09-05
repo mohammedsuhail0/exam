@@ -34,17 +34,35 @@ echo [*] Step 3/5: Groq AI Inference Key Configuration
 echo ------------------------------------------------------------------------------
 :ASK_API_KEY
 set "USER_API_KEY="
-set /p USER_API_KEY="Enter Groq API Key (starts with gsk_...): "
-
-if "%USER_API_KEY%"=="" (
-    echo [!] Error: API Key cannot be empty. Please enter a valid key to proceed.
-    echo.
-    goto ASK_API_KEY
+set "SAVED_KEY="
+if exist ".env" (
+    for /f "tokens=2 delims==" %%k in ('findstr /i "GROQ_API_KEY" .env 2^>nul') do (
+        set "SAVED_KEY=%%k"
+    )
 )
 
-set "GROQ_API_KEY=%USER_API_KEY%"
-echo GROQ_API_KEY=%GROQ_API_KEY% > .env
-echo [OK] API Key saved to .env and loaded successfully.
+if defined SAVED_KEY (
+    echo [*] Found existing API Key: !SAVED_KEY:~0,8!...
+    set /p USER_API_KEY="Enter new Groq API Key [or press ENTER to use saved key]: "
+    if "!USER_API_KEY!"=="" (
+        set "GROQ_API_KEY=!SAVED_KEY!"
+        echo [OK] Using saved Groq API Key.
+    ) else (
+        set "GROQ_API_KEY=!USER_API_KEY!"
+        echo GROQ_API_KEY=!USER_API_KEY!> .env
+        echo [OK] New API Key saved to .env.
+    )
+) else (
+    set /p USER_API_KEY="Enter Groq API Key (starts with gsk_...): "
+    if "!USER_API_KEY!"=="" (
+        echo [!] Error: API Key cannot be empty. Please enter a valid key to proceed.
+        echo.
+        goto ASK_API_KEY
+    )
+    set "GROQ_API_KEY=!USER_API_KEY!"
+    echo GROQ_API_KEY=!USER_API_KEY!> .env
+    echo [OK] API Key saved to .env.
+)
 echo.
 
 :: 4. LAUNCH CLEAN CHROME ON PORT 9222 (NO PRESET DUMMY URL)
